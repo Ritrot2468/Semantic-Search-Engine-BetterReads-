@@ -1,8 +1,11 @@
 import React from "react";
 import "../../styles/signup.css";
 import GenreDropDown from "./GenreDropDown";
+import { useNavigate, Link } from "react-router-dom";
+
 
 const Signup = () => {
+	const navigate = useNavigate();
 	
 	return (
 		<div className="signup-container">
@@ -46,10 +49,10 @@ const Signup = () => {
 				<GenreDropDown/>
 				
 				<div className="button-row">
-					<button className="register-button">Register</button>
+					<button className="register-button" onClick={()=>{ navigate("/signin")}}>Register</button>
 				</div>
 				<p className="form-footer">
-					Already have a account? <a href="/login">Login</a>
+					Already have a account? <Link to="/">Login</Link>
 				</p>
 			</div>
 		</div>
