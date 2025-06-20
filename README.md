@@ -41,7 +41,7 @@ The following features have been implemented for Milestone 2:
 1. Configured routing and implemented the majority of the required API endpoints.
 2. Developed key application functionalities:
    - **Sign-In & Registration Page**: Implemented sign-in and sign-up functionality, including support for guest access.
-   - **User Profile Page**: Implement functions for user profile page that displays user information fetched from the database.
-   - **Book Details Page**: Implement functions for a book details page that presents book data retrieved from the database.
-   - **Review Submission**: Implement function so user can write and submit reviews for books, which will be presisted to the database.
-   - **Book Search Page**: Implement a keyword-based search feature that matches against book titles and descriptions.
+   - **User Profile Page**: Implemented functions for user profile page that displays user information fetched from the database.
+   - **Book Details Page**: Implemented functions for a book details page that presents book data retrieved from the database.
+   - **Review Submission**: Implemented function so user can write and submit reviews for books, which will be presisted to the database.
+   - **Book Search Page**: Implemented a keyword-based search feature that matches against book titles and descriptions.
