@@ -7,7 +7,7 @@
 
 Our application is an intelligent, social book discovery platform tailored to passionate readers who want a more engaging and personalized experience than traditional apps like Goodreads. It allows users to explore and write reviews for books; receive personalized reading recommendations; and curate reading wishlists. By storing book metadata, user preferences, and behavioral insights, the platform delivers a highly individualized user experience. Built on MongoDB, it features account management, a natural language processing (NLP)–powered search engine, a reading recommendation system, and interactive user features.
 
-## Instruction for run the app with Docker
+## Instruction for running the app with Docker
 
 Clone the repository and run with Docker Compose. In your bash terminal, run:
 
@@ -44,4 +44,4 @@ The following features have been implemented for Milestone 2:
    - **User Profile Page**: Implement functions for user profile page that displays user information fetched from the database.
    - **Book Details Page**: Implement functions for a book details page that presents book data retrieved from the database.
    - **Review Submission**: Implement function so user can write and submit reviews for books, which will be presisted to the database.
-   - **Book Search Page**: Implemented a keyword-based search feature that matches against book titles and descriptions.
+   - **Book Search Page**: Implement a keyword-based search feature that matches against book titles and descriptions.
