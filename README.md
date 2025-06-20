@@ -19,7 +19,7 @@ docker-compose down        # tear down container
 
 ## Milestones
 ### Milestone 1:
-The following frontend features have been implemented:
+The following frontend features have been implemented for Milestone 1:
 - Book product card component
 - Book gallery component (carousel of many book cards)
 - Book review card component
