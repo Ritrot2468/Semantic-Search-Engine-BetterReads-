@@ -7,6 +7,7 @@ import Users   from '../model/users.js';
 import Reviews from '../model/reviews.js';
 import "./setup.js";
 
+
 let testUser1 = {
     username:       "User1",
     password:       'Password1',
@@ -91,6 +92,7 @@ describe('Reivew Tests', () => {
     });
 
     it('deletes a review', async () => {
+        //const review = await request(app).get(`/reviews/`)
       const { status, body } = await request(app).delete(`/reviews/${review1._id}`)
       expect(status).to.be.equals(200)
       const stillExists = await Reviews.findById(review1._id);
@@ -151,5 +153,44 @@ describe('Reivew Tests', () => {
      expect(res2.body).to.be.an('array').with.lengthOf(2);
      const ratings2 = res2.body.map((r) => r.rating);
      expect(ratings2).to.deep.equal([4, 1]);
+    });
+    it('check for increment of bookReviewCount & userReviewCount', async () => {
+        const user3 = await Users.create( {
+            username:       "User3",
+            password:       'Oreoluw$$$$1213',
+            favoriteGenres: ['Genre1'],
+            join_time:      new Date(),
+            reviews:        [],
+            wishList:       [],
+        });
+        const res2 = await request(app).get(`/reviews/user/${user3.username}`).expect(200);
+        console.log("res2.body", res2.body);
+        console.log("book2 Id", book2._id);
+        console.log("user3 Id", user3._id);
+        expect(res2.body).to.be.an('array').with.lengthOf(0);
+
+        await Books.findById(book2._id).then(book => {
+            console.log("book2 before", book);
+            expect(book.reviewCount).to.equal(2);});
+        // add review for another book
+        review2 = await request(app).post(`/books/${book2._id}/reviews`).send({
+            username: user3.username,
+            rating: 1,
+            description: "I hate this book"
+        });
+
+        const res3 = await request(app).get(`/reviews/user/${user3.username}`).expect(200);
+        console.log("user3 reviews", res3.body);
+        const userReviewID = res3.body[0]._id;
+        console.log("userReviewID", userReviewID);
+
+        expect(res3.body).to.be.an('array').with.lengthOf(1);
+        const addedReview = await Reviews.findById(userReviewID);
+        console.log("addedReview", addedReview);
+        await Books.findById(book2._id).then(book => {
+            console.log("book after review addition", book);
+            expect(book.reviewCount).to.equal(3);});
+        const ratings2 = res3.body.map((r) => r.rating);
+        expect(ratings2).to.deep.equal([1]);
     });
 });

@@ -152,18 +152,19 @@ describe('Books Tests', () => {
   });
 
   it('creates, updates, lists reviews', async () => {
-    const book = await Books.create(testBook1);
-    const user = await Users.create(testUser);
+    const book = await Books.insertOne(testBook1);
+    const user = await Users.insertOne(testUser);
+    console.log("user", user);
     const currentBook = await Books.findById(book._id).lean();
     expect(currentBook.reviewCount).to.equal(1);
     await request(app)
       .post(`/books/${book._id}/reviews`)
-      .send({ userId: user._id, rating: 5, description: 'Great!' })
+      .send({ username: user.username, rating: 5, description: 'Great!' })
       .expect(201);
 
     await request(app)
       .post(`/books/${book._id}/reviews`)
-      .send({ userId: user._id, rating: 4 })
+      .send({ username: user.username, rating: 4 })
       .expect(200);
 
     const { body } = await request(app).get(`/books/${book._id}/reviews`);
