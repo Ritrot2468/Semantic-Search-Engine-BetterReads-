@@ -7,6 +7,7 @@ import Books from '../model/books.js';
 import Users   from '../model/users.js';
 import Reviews from '../model/reviews.js';
 import "./setup.js"
+import bcrypt from 'bcrypt';
 
 const testBook1 = {
     title:            `Title1`,
@@ -132,7 +133,7 @@ describe('POST /signup', () => {
     expect(userInDb.favoriteGenres).to.include('Fantasy');
   });
 
-  it('rejects duplicate usernames', async () => {
+  it('rejects users who fail password requirements', async () => {
       const res = await request(app)
           .post('/users/signup')
           .send({
@@ -149,29 +150,36 @@ describe('POST /signup', () => {
     expect(res.body.error).to.equals("Password must be at least 12 characters and include uppercase, lowercase, number, and symbol.");
   });
 
-    it('rejects users who fail password requirements', async () => {
-        await Users.create({ username: 'charlie', password: 'badpassword', join_time:new Date()});
+    it('rejects duplicate usernames', async () => {
+        await Users.create({ username: 'charlie', password: 'another123^A21212', join_time: new Date()});
 
         const res = await request(app)
             .post('/users/signup')
-            .send({ username: 'charlie', password: 'another123^A21212' });
-        expect(res.status).to.equal(400);
+            .send({ username: 'charlie', password: 'another123^A212121231', favoriteGenres: [] });
+        expect(res.status).to.equal(409);
         expect(res.body.error).to.equals('Username already exists');
     });
 });
 
 describe('POST /login', () => {
   beforeEach(async () => {
-    await Users.create(testUser1);
+      const password = 'Password1?321234567890';
+      const hashedPassword = await bcrypt.hash(password, 10);
+      console.log("hashedPassword", hashedPassword);
+    await Users.create({
+        username:       "User123",
+        password:       hashedPassword,
+        join_time:      new Date(),
+    });
   });
 
   it('logs in with correct credentials', async () => {
     const res = await request(app)
       .post('/users/login')
-      .send({ username: 'User123', password: 'Password1@321234567890' });
+      .send({ username: 'User123', password: 'Password1?321234567890' });
 
     expect(res.status).to.equal(200);
-    expect(res.body.username).to.equal('User1');
+    expect(res.body.user.username).to.equal('User123');
   });
 
   it('rejects invalid password', async () => {
@@ -186,10 +194,10 @@ describe('POST /login', () => {
   it('rejects invalid username', async () => {
     const res = await request(app)
       .post('/users/login')
-      .send({ username: 'unknown', password: 'Password1@321234567890'});
+      .send({ username: 'unknown', password: 'Password1?321234567890'});
 
     expect(res.status).to.equal(401);
-    expect(res.body.error).to.equals('Invalid username or password');
+    expect(res.body.error).to.equals('This username does not exist. Please make sure username is correct and try again.');
   });
 });
 
