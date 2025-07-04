@@ -1,16 +1,15 @@
-import React, {useEffect, useState, useRef} from 'react';
+import {useEffect, useState, useRef} from 'react';
+import React from 'react';
 import './BookPage.css';
 import {BookPreview} from './BookPreview';
-import { GenreTags } from "./BookUtils.jsx";
-import StarRating from '../ratings/starRating'; // Assuming starRating.jsx exports as default or named StarRating
-import BookGalleryManager from "./BookGalleryManager.jsx";
-import BookReview from './bookReview.jsx'; // Assuming bookReview.jsx exports as default
-//import sampleData from "../../sampleData2.json";
-import {useParams} from "react-router-dom";
-import BookUtils from "../../utils/BookUtils.js";
-import {useSelector} from "react-redux";
+import { useParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { Container, Grid, Box, Typography, Button, CircularProgress } from '@mui/material';
-
+import StarRating from '../ratings/starRating';
+import BookReview from './bookReview.jsx';
+import { GenreTags } from "./BookUtils.jsx";
+import BookUtils from "../../utils/BookUtils.js";
+import './BookPage.css';
 
 const sectionTitleStyle = {
     fontFamily: 'Source Serif Pro, serif',
@@ -42,11 +41,8 @@ export default function BookDetailsPage() {
     const { bookId } = useParams();
     const username = useSelector((state) => state.user?.user?.username);
     const reviewRef = useRef(null);
-
-    //console.log("username", username);
-    //console.log("userId", userId);
-   console.log("bookId", bookId);
     const userAvatar = useSelector((state) => state.user?.user?.avatarUrl);
+    console.log("bookId", bookId);
 
     const [book, setBook] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
@@ -67,11 +63,12 @@ export default function BookDetailsPage() {
                 const review = await BookUtils.getUserReview(bookId, username);
                 const allReviews = await BookUtils.getBookReviews(bookId);
 
+                // Ore was here
                 console.log("review", review);
                 console.log("all reviews", allReviews);
                 const otherReviews = allReviews.filter(r => r.userId !== username);
                 console.log("other reviews", otherReviews);
-
+                // Non-ore touched
                 setBook(bookData);
                 setUserReview(review);
                 setBookReviews(otherReviews);
@@ -137,10 +134,7 @@ export default function BookDetailsPage() {
                     <div className="load-more">
                         <button className="btn" onClick={handleScrollToReview}>Make Review</button>
                     </div>
-                    <Box sx={{ my: 2 }}>
-                        <StarRating rating={Math.round(book.averageRating)} />
-                    </Box>
-                    <Button sx={buttonStyle}>Make Review</Button>
+
                 </Grid>
 
                 <Grid item xs={12} md={8}>
@@ -150,20 +144,14 @@ export default function BookDetailsPage() {
                     <Typography sx={{ color: 'var(--color-text-light)', mb: 2 }}>
                         {book.description}
                     </Typography>
-                    <Typography sx={{ fontSize: '0.9rem', color: 'var(--color-text-light)', mb: 2 }}>
-                        ISBN: {book.ISBN}
-                    </Typography>
-                    <GenreTags genres={book.genre} />
+
                 </Grid>
             </Grid>
-
 
             <div className="reviews-container">
                 <div className="review-section" ref={reviewRef}>
                     <div className="section-title">Your Review</div>
-            <Box sx={{ mt: { xs: 4, md: 6 } }}>
-                <Box>
-                    <Typography sx={sectionTitleStyle}>Your Review</Typography>
+
                     <BookReview
                         editable={isEditing || !userReview}
                         userImage={userAvatar}
@@ -188,7 +176,7 @@ export default function BookDetailsPage() {
                             Edit Review
                         </Button>
                     )}
-                </Box>
+                </div>
 
                 <Box sx={{ mt: 4 }}>
                     <Typography sx={sectionTitleStyle}>Reviews from Other Readers</Typography>
@@ -205,7 +193,7 @@ export default function BookDetailsPage() {
                         <Button sx={buttonStyle}>Look at more reviews...</Button>
                     </Box>
                 </Box>
-            </Box>
+            </div>
         </Container>
     );
 }
