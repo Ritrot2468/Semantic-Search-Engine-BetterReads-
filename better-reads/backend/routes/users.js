@@ -9,6 +9,7 @@ import axios from 'axios';
 import {isStrongPassword, isValidUsername} from "./utils.js";
 import { userValidationRules, validateRequest, sanitizeInput, paramValidation } from '../middleware/validators.js';
 import { param } from 'express-validator';
+import crypto from 'crypto';
 
 const router = express.Router();
 
@@ -16,7 +17,7 @@ const router = express.Router();
 // GET all users (for admin/testing)
 router.get('/', async (req, res) => {
     try {
-        const users = await Users.find();
+        const users = await Users.find().select('-password'); // Exclude passwords
         res.json(users);
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch users', details: err.message });
@@ -158,14 +159,21 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
         if (!match ) {
             return res.status(401).json({ error: 'Invalid username or password' });
         }
-
-        const token = jwt.sign({ id: user._id, username }, process.env.JWT_SECRET, {
+        const fingerprint = crypto.randomBytes(50).toString('base64');
+        const fingerprintHash = crypto.createHash('sha256').update(fingerprint).digest('hex');
+        const token = jwt.sign({ id: user._id, username, fgp: fingerprintHash }, process.env.JWT_SECRET, {
             expiresIn: process.env.JWT_EXPIRY
         });
         const userObject = user.toObject();
         delete userObject.password;
+        res.cookie('__Secure-Fp', fingerprint, {
+        httpOnly: true,
+        secure: true, 
+        sameSite: 'Strict',
+        path: '/'
+    });
         res.json({token, user: userObject});
-        // TODO: Replace with real session or JWT
+        
         //res.json({ message: 'Login successful', userId: user._id });
     } catch (err) {
         res.status(500).json({ error: 'Login failed', details: err.message });
@@ -259,6 +267,10 @@ router.put('/:userId', paramValidation.userId, validateRequest, async (req, res)
 // PATCH /users/update-wishlist/:id
 router.patch('/update-wishlist/:userId', [paramValidation.userId, ...userValidationRules.addToBooklist], validateRequest, async (req, res) => {
     try {
+        if (req.user.id !== req.params.userId) {
+            return res.status(403).json({ error: 'Forbidden: You can only update your own wishlist' });
+        }
+
         const { bookId, operation } = req.body;
         if (!['add', 'remove'].includes(operation)) {
             return res.status(400).json({ error: 'Invalid operation' });
