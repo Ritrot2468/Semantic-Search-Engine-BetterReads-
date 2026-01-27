@@ -10,6 +10,7 @@ import recommendationsRoutes from "./routes/recommendations.js";
 import nlpRoutes from "./routes/nlptextsearch.js";
 import path from 'path';
 import { fileURLToPath } from 'url';
+import cookieParser from 'cookie-parser';
 
 const PORT = process.env.PORT || 3000;
 
@@ -30,7 +31,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-
+app.use(cookieParser());
 // security middleware
 // Configure Helmet with strict CSP and other security headers
 app.use(helmet({

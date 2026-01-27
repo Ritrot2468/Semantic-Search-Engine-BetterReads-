@@ -10,6 +10,7 @@ import {isStrongPassword, isValidUsername} from "./utils.js";
 import { userValidationRules, validateRequest, sanitizeInput, paramValidation } from '../middleware/validators.js';
 import { param } from 'express-validator';
 import crypto from 'crypto';
+import { protect } from '../middleware/authentification.js';
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.get('/', async (req, res) => {
 });
 
 // retrieve userImageURL by busername// GET /avatarUrl/:username - Retrieve avatar URL by username
-router.get('/avatarUrl/:username', param('username').escape().customSanitizer(sanitizeInput), validateRequest, async (req, res) => {
+router.get('/avatarUrl/:username', param('username').escape().customSanitizer(sanitizeInput), validateRequest, protect, async (req, res) => {
     try {
         const user = await Users.findOne({ username: req.params.username });
 
@@ -40,7 +41,7 @@ router.get('/avatarUrl/:username', param('username').escape().customSanitizer(sa
 });
 
 // Get user details by ID or username
-router.get('/details/:identifier', param('identifier').customSanitizer(sanitizeInput), validateRequest, async (req, res) => {
+router.get('/details/:identifier', param('identifier').customSanitizer(sanitizeInput), validateRequest, protect, async (req, res) => {
     try {
         const { identifier } = req.params;
         let user;
@@ -69,7 +70,7 @@ router.get('/details/:identifier', param('identifier').customSanitizer(sanitizeI
 });
 
 // GET /users/:id - get profile
-router.get('/:userId', paramValidation.userId, validateRequest, async (req, res) => {
+router.get('/:userId', paramValidation.userId, validateRequest, protect, async (req, res) => {
     try {
         const user = await Users.findById(req.params.userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
@@ -168,7 +169,7 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
         delete userObject.password;
         res.cookie('__Secure-Fp', fingerprint, {
         httpOnly: true,
-        secure: true, 
+        secure: true, // set to true if using HTTPS or in production
         sameSite: 'Strict',
         path: '/'
     });
@@ -180,7 +181,7 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
     }
 });
 
-router.post('/change-password', async (req, res) => {
+router.post('/change-password', protect, async (req, res) => {
     try {
         const { username, currentPassword, newPassword } = req.body;
 
@@ -231,7 +232,7 @@ router.post('/logout', (req, res) => {
 
 
 // PUT /users/:id/genres/add-multiple
-router.put('/:userId/genres/add-multiple', paramValidation.userId, validateRequest, async (req, res) => {
+router.put('/:userId/genres/add-multiple', paramValidation.userId, validateRequest, protect, async (req, res) => {
     try {
         const { genres } = req.body;
 
@@ -253,7 +254,7 @@ router.put('/:userId/genres/add-multiple', paramValidation.userId, validateReque
 });
 
 // PUT /users/:id - update a total user
-router.put('/:userId', paramValidation.userId, validateRequest, async (req, res) => {
+router.put('/:userId', paramValidation.userId, validateRequest, protect, async (req, res) => {
     try {
         const updated = await Users.findByIdAndUpdate(req.params.userId, req.body, { new: true });
         if (!updated) return res.status(404).json({ error: 'User not found' });
@@ -265,7 +266,7 @@ router.put('/:userId', paramValidation.userId, validateRequest, async (req, res)
 });
 
 // PATCH /users/update-wishlist/:id
-router.patch('/update-wishlist/:userId', [paramValidation.userId, ...userValidationRules.addToBooklist], validateRequest, async (req, res) => {
+router.patch('/update-wishlist/:userId', [paramValidation.userId, ...userValidationRules.addToBooklist], validateRequest, protect, async (req, res) => {
     try {
         if (req.user.id !== req.params.userId) {
             return res.status(403).json({ error: 'Forbidden: You can only update your own wishlist' });
@@ -298,7 +299,7 @@ router.patch('/update-wishlist/:userId', [paramValidation.userId, ...userValidat
 
 
 // DELETE /users/:id - delete user (optional/admin)
-router.delete('/:userId', paramValidation.userId, validateRequest, async (req, res) => {
+router.delete('/:userId', paramValidation.userId, validateRequest, protect, async (req, res) => {
     try {
         const deleted = await Users.findByIdAndDelete(req.params.userId);
         if (!deleted) return res.status(404).json({ error: 'User not found' });

@@ -2,6 +2,7 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import {clearBooklist, setBooklist} from "./Booklist.js";
 import {clearUser} from "./UserSlice.js";
+import { apiFetch } from '../api/apiFetch.js';
 
 
 export const loginUser = createAsyncThunk(
@@ -9,7 +10,7 @@ export const loginUser = createAsyncThunk(
     async ({ username, password}, thunkAPI) => {
         try {
 
-            const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/users/login`, {
+            const res = await apiFetch(`${import.meta.env.VITE_BACKEND_URL}/users/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -53,7 +54,7 @@ export const signupUser = createAsyncThunk(
             });
             
             // Step 1: POST to /signup
-            const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/users/signup`, {
+            const res = await apiFetch(`${import.meta.env.VITE_BACKEND_URL}/users/signup`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password, favoriteGenres, wishList }),
@@ -66,7 +67,7 @@ export const signupUser = createAsyncThunk(
             }
 
             // Step 2: GET full user info
-            const profileRes = await fetch(`${import.meta.env.VITE_BACKEND_URL}/users/get-user/${username}`);
+            const profileRes = await apiFetch(`${import.meta.env.VITE_BACKEND_URL}/users/get-user/${username}`);
             if (!profileRes.ok) {
                 const error = await profileRes.json();
                 return thunkAPI.rejectWithValue(error.message || 'Failed to fetch profile');
@@ -92,7 +93,7 @@ export const fetchUserProfile = createAsyncThunk(
     'user/fetchUserProfile',
     async (userId, thunkAPI) => {
         try {
-            const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/users/${userId}`, {
+            const res = await apiFetch(`${import.meta.env.VITE_BACKEND_URL}/users/${userId}`, {
                 credentials: 'include',
             });
 

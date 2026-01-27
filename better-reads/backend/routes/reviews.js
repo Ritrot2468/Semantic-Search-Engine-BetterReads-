@@ -7,9 +7,10 @@ import mongoose from "mongoose";
 import axios from 'axios';
 import { validateRequest, reviewValidationRules, paramValidation, queryValidation } from '../middleware/validators.js';
 const router = express.Router();
+import { protect } from '../middleware/authentification.js';
 
 // PUT /reviews/:reviewId - Edit a user's review
-router.put('/:reviewId', [paramValidation.reviewId, ...reviewValidationRules.update], validateRequest, async (req, res) => {
+router.put('/:reviewId', [paramValidation.reviewId, ...reviewValidationRules.update], validateRequest, protect, async (req, res) => {
     try {
         const { reviewId } = req.params;
         const { rating, description } = req.body;
@@ -38,7 +39,7 @@ router.put('/:reviewId', [paramValidation.reviewId, ...reviewValidationRules.upd
 });
 
 // DELETE /reviews/:reviewId - Delete a user's review
-router.delete('/:reviewId', paramValidation.reviewId, validateRequest, async (req, res) => {
+router.delete('/:reviewId', paramValidation.reviewId, validateRequest, protect, async (req, res) => {
     try {
         const { reviewId } = req.params;
         if (!mongoose.Types.ObjectId.isValid(reviewId)) {

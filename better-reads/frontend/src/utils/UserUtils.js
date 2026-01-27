@@ -1,11 +1,11 @@
 import BookUtils from "./BookUtils.js";
-
+import { apiFetch } from '../api/apiFetch.js';
 const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
 const UserUtils = {
     async changeUserPassword(username, oldPassword, newPassword) {
         try {
-            const res = await fetch(`${BASE_URL}/users/change-password`, {
+            const res = await apiFetch(`${BASE_URL}/users/change-password`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
