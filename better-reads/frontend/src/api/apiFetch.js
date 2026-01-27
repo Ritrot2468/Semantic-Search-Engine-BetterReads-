@@ -20,8 +20,8 @@ export const apiFetch = async (endpoint, options = {}) => {
         // allows the browser to send the HttpOnly Fingerprint cookie automatically
         credentials: 'include', 
     };
-
-    const response = await fetch(`${endpoint}`, config);
+    const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
+    const response = await fetch(url, config);
 
     // Handle Global Errors (401 Unauthorized)
     if (response.status === 401) {
