@@ -215,12 +215,24 @@ def update_matrix_with_reviews():
 def recommend_books(data: RecommendRequest):
     username = str(data.username)
     user_item_matrix = None
+    use_popularity_fallback = False 
 
+    # do a cache check as a fast track
+    cache_key = f"ml:rec:{username}"
+    cached_recs = redis_client.get(cache_key)
+    if cached_recs:
+        print(f"Bypassing math! Returning cached recs for {username}")
+        return RecommendResponse(
+            recommendations=json.loads(cached_recs),
+            message="Results fetched from cache"
+        )
     # Try to get user-item matrix from Redis
     try:
+        # in case of critical error from redis itself -> raide error code 500
         cached_data = redis_client.get(USER_ITEM_MATRIX_KEY)
         if not cached_data:
-            raise HTTPException(status_code=404, detail="User-item matrix not found in Redis")
+            print("CRITICAL: USER_ITEM_MATRIX_KEY not found in Redis!")
+            raise HTTPException(status_code=500, detail="User-item matrix not found in Redis")
 
         print("Using cached user-item matrix from Redis")
         # Convert the cached JSON string to a dictionary
@@ -232,7 +244,8 @@ def recommend_books(data: RecommendRequest):
             
         print(f"User {username} found in matrix_dict. Matrix has {len(matrix_dict)} users.")
         print(f"User's data in matrix_dict: {matrix_dict.get(username, 'NOT_FOUND')}")
-            
+
+        # Since pandas hates empty rows -> prevent new users from being deleted due to lack of ratings    
         # Fix: Ensure users with empty rating dictionaries are preserved
         # Add a dummy rating for users with empty dictionaries to prevent pandas from dropping them
         matrix_dict_fixed = {}
@@ -256,114 +269,124 @@ def recommend_books(data: RecommendRequest):
             raise e
         print(f"Error retrieving from Redis: {e}")
         raise HTTPException(status_code=500, detail=f"Error processing recommendation matrix: {str(e)}")
-            
-    # Fill NaN values with 0 to ensure matrix operations work correctly
-    user_item_matrix = user_item_matrix.fillna(0)
-    
-    # Create mappings between user/item IDs and matrix indices
-    user_ids = list(user_item_matrix.index)
-    item_ids = list(user_item_matrix.columns)
-    
-    user_mapping = {uid: i for i, uid in enumerate(user_ids)}
-    item_mapping = {iid: i for i, iid in enumerate(item_ids)}
-    
-    # Check if user exists in mapping
-    if username not in user_mapping:
-        print(f"User {username} not found in user mapping.")
-        raise HTTPException(status_code=404, detail=f"User {username} not found in recommendation matrix")
-    
-    # Convert to sparse matrix format for LightFM
-    interactions = []
-    row_indices = []
-    col_indices = []
-    ratings = []
-    
-    # Build sparse matrix data
-    for user, user_idx in user_mapping.items():
-        user_ratings = matrix_dict.get(user, {})
-        for item, rating in user_ratings.items():
-            if item in item_mapping and rating is not None:
-                row_indices.append(user_idx)
-                col_indices.append(item_mapping[item])
-                ratings.append(float(rating))
-    
-    # Create sparse matrix
-    n_users = len(user_mapping)
-    n_items = len(item_mapping)
-    interaction_matrix = sp.coo_matrix((ratings, (row_indices, col_indices)), 
-                                     shape=(n_users, n_items))
-    
-    print(f"Created sparse interaction matrix with shape {interaction_matrix.shape}")
-    
-    # Train LightFM model
-    model = LightFM(loss='warp')
-    
-    try:
-        # Train for a few epochs - adjust as needed for performance vs. accuracy
-        model.fit(interaction_matrix, epochs=5, verbose=True)
-        print("LightFM model trained successfully")
+
+    if not use_popularity_fallback:        
+        # Fill NaN values with 0 to ensure matrix operations work correctly
+        user_item_matrix = user_item_matrix.fillna(0)
         
-        # Get user index
-        user_idx = user_mapping[username]
+        # Create mappings between user/item IDs and matrix indices
+        user_ids = list(user_item_matrix.index)
+        item_ids = list(user_item_matrix.columns)
         
-        # Predict scores for all items
-        scores = model.predict(user_idx, np.arange(n_items))
+        user_mapping = {uid: i for i, uid in enumerate(user_ids)}
+        item_mapping = {iid: i for i, iid in enumerate(item_ids)}
         
-        # Get items the user has already interacted with
-        user_items = set()
-        if username in matrix_dict:
-            user_items = set(matrix_dict[username].keys())
+        # Check if user exists in mapping
+        if username not in user_mapping:
+            print(f"User {username} not found in user mapping.")
+            raise HTTPException(status_code=404, detail=f"User {username} not found in recommendation matrix")
         
-        # Create list of (item_id, score) tuples, excluding items the user has already rated
-        item_scores = []
-        for item_id, item_idx in item_mapping.items():
-            if item_id not in user_items:  # Only recommend items the user hasn't rated
-                item_scores.append((item_id, scores[item_idx]))
+        # Convert to sparse matrix format for LightFM
+        interactions = []
+        row_indices = []
+        col_indices = []
+        ratings = []
         
-        # Sort by score in descending order
-        item_scores.sort(key=lambda x: x[1], reverse=True)
-        
-        # Get top 20 recommendations
-        top_items = [item_id for item_id, _ in item_scores[:20]]
-        
-        print(f"Generated {len(top_items)} recommendations for user {username}")
-        
-    except Exception as e:
-        print(f"Error training LightFM model: {e}")
-        # Fall back to a simpler approach if LightFM fails
-        print("Falling back to popularity-based recommendations")
-        
-        # Get all ratings
-        all_ratings = {}
-        for user_ratings in matrix_dict.values():
+        # Build sparse matrix data
+        for user, user_idx in user_mapping.items():
+            user_ratings = matrix_dict.get(user, {})
             for item, rating in user_ratings.items():
-                if item not in all_ratings:
-                    all_ratings[item] = []
-                all_ratings[item].append(rating)
+                if item in item_mapping and rating is not None:
+                    row_indices.append(user_idx)
+                    col_indices.append(item_mapping[item])
+                    ratings.append(float(rating))
         
-        # Calculate average rating and count for each item
-        item_popularity = {}
-        for item, ratings in all_ratings.items():
-            avg_rating = sum(ratings) / len(ratings)
-            count = len(ratings)
-            item_popularity[item] = avg_rating * count
+        # Create sparse matrix
+        n_users = len(user_mapping)
+        n_items = len(item_mapping)
+        interaction_matrix = sp.coo_matrix((ratings, (row_indices, col_indices)), 
+                                        shape=(n_users, n_items))
         
-        # Sort items by popularity
-        sorted_items = sorted(item_popularity.items(), key=lambda x: x[1], reverse=True)
+        print(f"Created sparse interaction matrix with shape {interaction_matrix.shape}")
         
-        # Get user's items to exclude
-        user_items = set()
-        if username in matrix_dict:
-            user_items = set(matrix_dict[username].keys())
+        # Train LightFM model
+        model = LightFM(loss='warp')
         
-        # Get top items excluding what the user has already rated
-        top_items = []
-        for item, _ in sorted_items:
-            if item not in user_items:
-                top_items.append(item)
-                if len(top_items) >= 20:
-                    break
-    
+        try:
+            # Train for a few epochs - adjust as needed for performance vs. accuracy
+            model.fit(interaction_matrix, epochs=5, verbose=True)
+            print("LightFM model trained successfully")
+            
+            # Get user index
+            user_idx = user_mapping[username]
+            
+            # Predict scores for all items
+            scores = model.predict(user_idx, np.arange(n_items))
+            
+            # Get items the user has already interacted with
+            user_items = set()
+            if username in matrix_dict:
+                user_items = set(matrix_dict[username].keys())
+            
+            # Create list of (item_id, score) tuples, excluding items the user has already rated
+            item_scores = []
+            for item_id, item_idx in item_mapping.items():
+                if item_id not in user_items:  # Only recommend items the user hasn't rated
+                    item_scores.append((item_id, scores[item_idx]))
+            
+            # Sort by score in descending order
+            item_scores.sort(key=lambda x: x[1], reverse=True)
+            
+            # Get top 20 recommendations
+            top_items = [item_id for item_id, _ in item_scores[:20]]
+            
+            # store top 20 recommendations for user in cache
+            user_cache_key = f"ml:rec:{username}"
+
+            redis_client.setex(
+                user_cache_key,
+                3600, # keep ttl for 1 hr
+                json.dumps(top_items)
+            )
+            print(f"Generated {len(top_items)} recommendations for user {username}")
+            
+        except Exception as e:
+            print(f"Error training LightFM model: {e}")
+            # Fall back to a simpler approach if LightFM fails
+            print("Falling back to popularity-based recommendations")
+            use_popularity_fallback = True
+           
+    if use_popularity_fallback:
+         # Get all ratings
+            all_ratings = {}
+            for user_ratings in matrix_dict.values():
+                for item, rating in user_ratings.items():
+                    if item not in all_ratings:
+                        all_ratings[item] = []
+                    all_ratings[item].append(rating)
+            
+            # Calculate average rating and count for each item
+            item_popularity = {}
+            for item, ratings in all_ratings.items():
+                avg_rating = sum(ratings) / len(ratings)
+                count = len(ratings)
+                item_popularity[item] = avg_rating * count
+            
+            # Sort items by popularity
+            sorted_items = sorted(item_popularity.items(), key=lambda x: x[1], reverse=True)
+            
+            # Get user's items to exclude
+            user_items = set()
+            if username in matrix_dict:
+                user_items = set(matrix_dict[username].keys())
+            
+            # Get top items excluding what the user has already rated
+            top_items = []
+            for item, _ in sorted_items:
+                if item not in user_items:
+                    top_items.append(item)
+                    if len(top_items) >= 20:
+                        break        
     # Return recommendations using the defined response model
     return RecommendResponse(
         recommendations=top_items,
