@@ -109,9 +109,9 @@ const BookUtils = {
     },
 
     // Get a single user's review for a book
-    async getUserReview(bookId, userId) {
+    async getUserReview(bookId, username) {
         try {
-            const res = await apiFetch(`${BASE_URL}/reviews/user-review?bookId=${bookId}&userId=${userId}`);
+            const res = await apiFetch(`${BASE_URL}/reviews/user-review?bookId=${bookId}&username=${username}`);
             if (!res.ok) throw new Error('Failed to fetch user review');
             return await res.json(); // could be null if no review
         } catch (err) {

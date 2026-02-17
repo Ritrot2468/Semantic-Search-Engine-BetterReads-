@@ -76,6 +76,7 @@ export default function BookDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [isInWishlist, setIsInWishlist] = useState(false);
     const [wishlistLoading, setWishlistLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
 
     const handleScrollToReview = () => {
         reviewRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -92,13 +93,14 @@ export default function BookDetailsPage() {
             }
         } catch (err) {
             console.error('Failed to delete review:', err);
-            alert('Could not delete the revigew. Please try again.');
+            alert('Could not delete the review. Please try again.');
         }
     };
 
 
     useEffect(() => {
         const fetchData = async () => {
+           
             setLoading(true);
             try {
                 let bookData = await BookUtils.getBookById(bookId);
@@ -121,6 +123,7 @@ export default function BookDetailsPage() {
                 setBookReviews(otherReviews);
             } catch (err) {
                 console.error('Failed to fetch book data:', err);
+                
             } finally {
                 setLoading(false);
             }
@@ -137,24 +140,6 @@ export default function BookDetailsPage() {
         }
     }, [booklist, bookId]);
 
-    // useEffect(() => {
-    //     const fetchAvatars = async () => {
-    //         const map = {};
-    //         await Promise.all(
-    //             bookReviews.map(async (review) => {
-    //                 if (review.userId) {
-    //                     const avatar = await BookUtils.getUserAvatar(review.userId);
-    //                     map[review.userId] = avatar;
-    //                 }
-    //             })
-    //         );
-    //         setAvatarMap(map);
-    //     };
-
-    //     if (bookReviews.length > 0) {
-    //         fetchAvatars();
-    //     }
-    // }, [bookReviews]);
 
     if (loading) {
         return (
@@ -248,16 +233,26 @@ export default function BookDetailsPage() {
                             rating={userReview?.rating}
                             reviewText={userReview?.description}
                             onSave={async ({ rating, description }) => {
-                                // Description is already sanitized in BookReview component
-                                const newReview = await BookUtils.upsertReview(bookId, username, { rating, description });
-                                // Sanitize the response data
-                                const sanitizedReview = sanitizeObject(newReview);
-                                setUserReview(sanitizedReview);
-                                setBookReviews(prev => {
-                                    const others = prev.filter(r => r.userId?.username !== username);
-                                    return [sanitizedReview, ...others];
-                                });
-                                setIsEditing(false);
+                                try {
+                                    // Description is already sanitized in BookReview component
+                                    const newReview = await BookUtils.upsertReview(bookId, username, { rating, description });
+                                    // Sanitize the response data
+                                    const sanitizedReview = sanitizeObject(newReview);
+                                    setUserReview(sanitizedReview);
+                                    setBookReviews(prev => {
+                                        const others = prev.filter(r => r.userId?.username !== username);
+                                        return [sanitizedReview, ...others];
+                                    });
+                                    setIsEditing(false);
+                                } catch(err) {
+                                    const errorMsg = err.response?.data?.errors?.[0]?.msg 
+                                                    || err.response?.data?.error 
+                                                    || "An error occurred while saving.";
+                                    
+                                    alert(`Validation Error: ${errorMsg}`);
+
+                                }
+                               
                             }}
                         />
                         {userReview && !isEditing && (

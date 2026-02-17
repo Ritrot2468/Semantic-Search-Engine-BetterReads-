@@ -100,8 +100,8 @@ export const reviewValidationRules = {
       .customSanitizer(sanitizeInput),
       
     body('rating')
-      .optional()
-      .isFloat({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
+      .exists().withMessage('Rating is required')
+      .isFloat({ min: 0.5, max: 5 }).withMessage('Rating must be between 1 and 5'),
       
     body('description')
       .optional()
@@ -163,8 +163,9 @@ export const queryValidation = {
     query('bookId')
       .isMongoId().withMessage('Invalid book ID format'),
       
-    query('userId')
+    query('username')
       .notEmpty().withMessage('Username is required')
+      .isString().withMessage('Username must be a string')
       .trim()
       .customSanitizer(sanitizeInput),
 ],

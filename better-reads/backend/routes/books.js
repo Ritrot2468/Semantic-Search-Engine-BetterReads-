@@ -145,7 +145,7 @@ router.get('/:bookId/reviews', async (req, res) => {
 // POST /books/:id/reviews - Create or update a review for a book
 router.post('/:bookId/reviews', [paramValidation.bookId, ...reviewValidationRules.create], validateRequest, async (req, res) => {
     try {
-        const { bookId: bookId } = req.params;
+        const { bookId } = req.params;
         const { username, rating, description } = req.body;
 
         if (!username) {
@@ -169,8 +169,8 @@ router.post('/:bookId/reviews', [paramValidation.bookId, ...reviewValidationRule
             const updated = await Reviews.findOneAndUpdate(
                 { bookId, userId},
                 { ...updateFields, updatedAt: new Date() },
-                { new: true }
-            );
+                { new: true, upsert: true, runValidators: true }
+            ).populate('userId', 'username avatarUrl');
             
             // Update the recommender matrix
             try {

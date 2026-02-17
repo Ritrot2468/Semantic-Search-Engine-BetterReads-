@@ -81,22 +81,20 @@ router.delete('/:reviewId', paramValidation.reviewId, validateRequest, protect, 
 // GET /reviews/user-review?bookId=...&userId=...
 // Get the single review on a given book (bookID) left by current user (pass the username)
 router.get('/user-review', queryValidation.userReview, validateRequest, async (req, res) => {
-    const { bookId, userId } = req.query;
+    const { bookId, username } = req.query;
 
-    if (!bookId || !userId) {
-        return res.status(400).json({ error: 'Both bookId and userId are required' });
+    if (!bookId || !username) {
+        return res.status(400).json({ error: 'Both bookId and username are required' });
     }
 
     try {
-        const query = {
-            $and: [
-                { bookId: new mongoose.Types.ObjectId(bookId) },
-                { userId }
-            ]
-        };
+       const user = await Users.findOne({ username });
+        if (!user) return res.json(null);
 
-        const review = await Reviews.findOne(query);
-
+        const review = await Reviews.findOne({
+            bookId, 
+            userId: user._id
+        });
         if (!review) {
             return res.status(200).json(null);
         }
