@@ -73,7 +73,6 @@ export default function BookDetailsPage() {
     const [userReview, setUserReview] = useState(null);
     const [bookReviews, setBookReviews] = useState([]);
     const [reviewsToShow, setReviewsToShow] = useState(3);
-    const [avatarMap, setAvatarMap] = useState({});
     const [loading, setLoading] = useState(true);
     const [isInWishlist, setIsInWishlist] = useState(false);
     const [wishlistLoading, setWishlistLoading] = useState(false);
@@ -89,7 +88,7 @@ export default function BookDetailsPage() {
             if (review) {
                 await BookUtils.deleteReview(review._id);
                 setUserReview(null);
-                setBookReviews(prev => prev.filter(r => r.userId !== username));
+                setBookReviews(prev => prev.filter(r => r.userId?.username !== username));
             }
         } catch (err) {
             console.error('Failed to delete review:', err);
@@ -114,7 +113,7 @@ export default function BookDetailsPage() {
                 // Ore was here
                 console.log("review", review);
                 console.log("all reviews", allReviews);
-                const otherReviews = allReviews.filter(r => r.userId !== username);
+                const otherReviews = allReviews.filter(r => r.userId?.username !== username);
                 console.log("other reviews", otherReviews); 
                 // Non-ore touched
                 setBook(bookData);
@@ -138,24 +137,24 @@ export default function BookDetailsPage() {
         }
     }, [booklist, bookId]);
 
-    useEffect(() => {
-        const fetchAvatars = async () => {
-            const map = {};
-            await Promise.all(
-                bookReviews.map(async (review) => {
-                    if (review.userId) {
-                        const avatar = await BookUtils.getUserAvatar(review.userId);
-                        map[review.userId] = avatar;
-                    }
-                })
-            );
-            setAvatarMap(map);
-        };
+    // useEffect(() => {
+    //     const fetchAvatars = async () => {
+    //         const map = {};
+    //         await Promise.all(
+    //             bookReviews.map(async (review) => {
+    //                 if (review.userId) {
+    //                     const avatar = await BookUtils.getUserAvatar(review.userId);
+    //                     map[review.userId] = avatar;
+    //                 }
+    //             })
+    //         );
+    //         setAvatarMap(map);
+    //     };
 
-        if (bookReviews.length > 0) {
-            fetchAvatars();
-        }
-    }, [bookReviews]);
+    //     if (bookReviews.length > 0) {
+    //         fetchAvatars();
+    //     }
+    // }, [bookReviews]);
 
     if (loading) {
         return (
@@ -255,7 +254,7 @@ export default function BookDetailsPage() {
                                 const sanitizedReview = sanitizeObject(newReview);
                                 setUserReview(sanitizedReview);
                                 setBookReviews(prev => {
-                                    const others = prev.filter(r => r.userId !== username);
+                                    const others = prev.filter(r => r.userId?.username !== username);
                                     return [sanitizedReview, ...others];
                                 });
                                 setIsEditing(false);
@@ -280,8 +279,8 @@ export default function BookDetailsPage() {
                     {bookReviews.slice(0, reviewsToShow).map((review, idx) => (
                         <BookReview
                             key={idx}
-                            userImage={avatarMap[review.userId]}
-                            username={review.userId}
+                            userImage={review.userId?.avatarUrl}
+                            username={review.userId?.username}
                             rating={review.rating}
                             reviewText={review.description}
                         />

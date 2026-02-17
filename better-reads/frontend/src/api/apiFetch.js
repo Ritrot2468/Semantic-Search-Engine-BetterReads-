@@ -21,6 +21,7 @@ export const apiFetch = async (endpoint, options = {}) => {
         credentials: 'include', 
     };
     const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
+    console.log(`Sending request to ${endpoint}. Token present: ${!!headers['Authorization']}`);
     const response = await fetch(url, config);
 
     // Handle Global Errors (401 Unauthorized)

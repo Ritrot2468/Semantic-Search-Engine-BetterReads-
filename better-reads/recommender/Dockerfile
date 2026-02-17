@@ -20,6 +20,7 @@ RUN LIGHTFM_NO_PKG_CONFIG=1 pip install lightfm --no-use-pep517 || \
 
 # 4. Install the rest of your requirements
 COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .

@@ -3,8 +3,12 @@ import Books from '../model/books.js';
 import Reviews from '../model/reviews.js';
 import Users from "../model/users.js";
 import axios from 'axios';
+import { protect } from '../middleware/authentification.js';
 import { validateRequest, queryValidation, paramValidation, reviewValidationRules } from '../middleware/validators.js';
 const router = express.Router();
+
+
+/////// public routes (ALL GET endpoints) ////
 
 // retrieve books via a generic main.py query
 router.get('/search', queryValidation.search, validateRequest, async (req, res) => {
@@ -97,6 +101,163 @@ router.get('/genre-search', queryValidation.search, validateRequest, async (req,
 });
 
 
+// GET /books/popular - Get popular books sorted by average rating
+router.get('/popular', async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 20; // Default to 20 books
+        
+        // Find books with at least some reviews and sort by average rating
+        const popularBooks = await Books.find({ reviewCount: { $gt: 0 } })
+            .sort({ averageRating: -1 }) // Sort by highest rating first
+            .limit(limit);
+                
+        res.json(popularBooks);
+    } catch (err) {
+        console.error('Failed to fetch popular books:', err);
+        res.status(500).json({ error: 'Failed to fetch popular books', details: err.message });
+    }
+});
+
+// retrieve a book by bookId
+router.get('/:bookId', paramValidation.bookId, validateRequest, async (req, res) => {
+    try {
+        const book = await Books.findById(req.params.bookId);
+        if (!book) return res.status(404).json({ error: 'Book not found' });
+        res.json(book);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch book', details: err.message });
+    }
+});
+
+// GET /books/:id/reviews - Get all reviews for a book
+router.get('/:bookId/reviews', async (req, res) => {
+    try {
+        const { bookId: bookId } = req.params;
+        const reviews = await Reviews.find({ bookId }).populate('userId', 'username avatarUrl').sort({ createdAt: -1 });
+        res.json(reviews);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch reviews', details: err.message });
+    }
+});
+
+//////////// POST endpoints ///////////
+
+// POST /books/:id/reviews - Create or update a review for a book
+router.post('/:bookId/reviews', [paramValidation.bookId, ...reviewValidationRules.create], validateRequest, async (req, res) => {
+    try {
+        const { bookId: bookId } = req.params;
+        const { username, rating, description } = req.body;
+
+        if (!username) {
+            return res.status(400).json({ error: 'username is required' });
+        }
+
+        const user = await Users.findOne({ username });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        const userId = user._id;
+
+        const updateFields = {};
+        if (rating !== undefined) updateFields.rating = rating;
+        if (description !== undefined) updateFields.description = description;
+
+        const existingReview = !!(await Reviews.findOne({ bookId, userId}));
+
+        if (existingReview) {
+            // Update the existing review
+            const updated = await Reviews.findOneAndUpdate(
+                { bookId, userId},
+                { ...updateFields, updatedAt: new Date() },
+                { new: true }
+            );
+            
+            // Update the recommender matrix
+            try {
+                await axios.post('http://recommender:5001/update-matrix');
+                console.log('Recommender matrix updated after review update');
+            } catch (updateError) {
+                console.error('Failed to update recommender matrix:', updateError.message);
+                // Don't fail the request if matrix update fails
+            }
+            
+            return res.status(200).json(updated);
+        }
+
+        // Create a new review if none exists
+        const newReview = new Reviews({
+            bookId,
+            userId,
+            ...updateFields,
+            createdAt: new Date(),
+        });
+
+        const savedReview = await newReview.save();
+
+        const book = await Books.findById(bookId);
+        if (!book) throw new Error('Book not found');
+
+
+        //  Increment book review count
+        book.reviewCount = (book.reviewCount || 0) + 1;
+        await book.save();
+
+        //  Add review to user if not already included
+        user.reviews.push(savedReview._id);
+        await user.save();
+        
+        // Update the recommender matrix
+        try {
+            await axios.post('http://recommender:5001/update-matrix');
+            console.log('Recommender matrix updated after new review');
+        } catch (updateError) {
+            console.error('Failed to update recommender matrix:', updateError.message);
+            // Don't fail the request if matrix update fails
+        }
+        const populatedReview = await Reviews.findById(savedReview._id).populate('userId', 'username avatarUrl');
+        
+        res.status(201).json(populatedReview);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to create or update review', details: err.message });
+    }
+});
+
+
+// add book to wishlist
+router.post('/:bookId/wishlist', protect, async (req, res) => {
+    try {
+        const userId  = req.user.id;
+        
+        const updatedUser = await Users.findByIdAndUpdate(
+            userId,
+            { $addToSet: { wishList: req.params.bookId } },
+            { new: true }
+        );
+
+        if (!updatedUser) return res.status(404).json({ error: 'User not found' });
+        res.json(updatedUser.wishList);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to add to wishlist', details: err.message });
+    }
+});
+
+router.delete('/:bookId/wishlist', protect, async (req, res) => {
+    try {
+        const userId  = req.user.id;
+        
+        const updatedUser = await Users.findByIdAndUpdate(
+            userId,
+            { $pull: { wishList: req.params.bookId } },
+            { new: true }
+        );
+
+        if (!updatedUser) return res.status(404).json({ error: 'User not found' });
+        res.json(updatedUser.wishList);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to remove from wishlist', details: err.message });
+    }
+});
+
 // SEARCH ENDPOINT WITH AND SEARCHES FOR ALL GENRES
 // router.get('/genre-search', async (req, res) => {
 //     try {
@@ -183,187 +344,23 @@ router.get('/genre-search', queryValidation.search, validateRequest, async (req,
 // });
 
 // GET books by multiple genres /books/genres?genres=Romance,Fiction&sort=desc
-router.get('/genres', async (req, res) => {
-    try {
-        const { genres, sort = 'desc' } = req.query;
+// router.get('/genres', async (req, res) => {
+//     try {
+//         const { genres, sort = 'desc' } = req.query;
 
-        if (!genres) {
-            return res.status(400).json({ error: 'Genres query parameter is required' });
-        }
+//         if (!genres) {
+//             return res.status(400).json({ error: 'Genres query parameter is required' });
+//         }
 
-        const genreArray = genres.split(',').map(g => g.trim());
+//         const genreArray = genres.split(',').map(g => g.trim());
 
-        const books = await Books.find({ genre: { $in: genreArray } })
-            .sort({ averageRating: sort === 'asc' ? 1 : -1 });
+//         const books = await Books.find({ genre: { $in: genreArray } })
+//             .sort({ averageRating: sort === 'asc' ? 1 : -1 });
 
-        res.json(books);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch books by genres', details: err.message });
-    }
-});
-
-// GET /books/popular - Get popular books sorted by average rating
-router.get('/popular', async (req, res) => {
-    try {
-        const limit = parseInt(req.query.limit) || 20; // Default to 20 books
-        
-        // Find books with at least some reviews and sort by average rating
-        const popularBooks = await Books.find({ reviewCount: { $gt: 0 } })
-            .sort({ averageRating: -1 }) // Sort by highest rating first
-            .limit(limit);
-                
-        res.json(popularBooks);
-    } catch (err) {
-        console.error('Failed to fetch popular books:', err);
-        res.status(500).json({ error: 'Failed to fetch popular books', details: err.message });
-    }
-});
-
-// GET /books/:id/reviews - Get all reviews for a book
-router.get('/:bookId/reviews', async (req, res) => {
-    try {
-        const { bookId: bookId } = req.params;
-        const reviews = await Reviews.find({ bookId }).sort({ createdAt: -1 });
-        res.json(reviews);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch reviews', details: err.message });
-    }
-});
-
-// retrieve a book by bookId
-router.get('/:bookId', paramValidation.bookId, validateRequest, async (req, res) => {
-    try {
-        const book = await Books.findById(req.params.bookId);
-        if (!book) return res.status(404).json({ error: 'Book not found' });
-        res.json(book);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch book', details: err.message });
-    }
-});
-
-
-
-
-//TODO: add pagination?
-// retrieves all books in database
-router.get('/', async (req, res) => {
-    const categories = await Books.find();
-    res.json(categories);
-});
-
-
-// POST /books/:id/reviews - Create or update a review for a book
-router.post('/:bookId/reviews', [paramValidation.bookId, ...reviewValidationRules.create], validateRequest, async (req, res) => {
-    try {
-        const { bookId: bookId } = req.params;
-        const { username, rating, description } = req.body;
-
-        if (!username) {
-            return res.status(400).json({ error: 'username is required' });
-        }
-
-        const updateFields = {};
-        if (rating !== undefined) updateFields.rating = rating;
-        if (description !== undefined) updateFields.description = description;
-
-        const existingReview = !!(await Reviews.findOne({ bookId, userId: username }));
-
-        if (existingReview) {
-            // Update the existing review
-            const updated = await Reviews.findOneAndUpdate(
-                { bookId, userId: username },
-                { ...updateFields, updatedAt: new Date() },
-                { new: true }
-            );
-            
-            // Update the recommender matrix
-            try {
-                await axios.post('http://recommender:5001/update-matrix');
-                console.log('Recommender matrix updated after review update');
-            } catch (updateError) {
-                console.error('Failed to update recommender matrix:', updateError.message);
-                // Don't fail the request if matrix update fails
-            }
-            
-            return res.status(200).json(updated);
-        }
-
-        // Create a new review if none exists
-        const newReview = new Reviews({
-            bookId,
-            userId: username,
-            ...updateFields,
-            createdAt: new Date(),
-        });
-
-        const savedReview = await newReview.save();
-
-        const book = await Books.findById(bookId);
-        if (!book) throw new Error('Book not found');
-
-        const user = await Users.findOne({username});
-        if (!user) throw new Error('User not found');
-
-        //  Increment book review count
-        book.reviewCount = (book.reviewCount || 0) + 1;
-        await book.save();
-
-        //  Add review to user if not already included
-        user.reviews.push(savedReview._id);
-        await user.save();
-        
-        // Update the recommender matrix
-        try {
-            await axios.post('http://recommender:5001/update-matrix');
-            console.log('Recommender matrix updated after new review');
-        } catch (updateError) {
-            console.error('Failed to update recommender matrix:', updateError.message);
-            // Don't fail the request if matrix update fails
-        }
-        
-        res.status(201).json(savedReview);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to create or update review', details: err.message });
-    }
-});
-
-
-// add book to wishlist
-router.post('/:bookId/wishlist', async (req, res) => {
-    try {
-        const { userId } = req.body;
-        if (!userId) return res.status(400).json({ error: 'userId is required' });
-
-        const updatedUser = await Users.findByIdAndUpdate(
-            userId,
-            { $addToSet: { wishList: req.params.bookId } },
-            { new: true }
-        );
-
-        if (!updatedUser) return res.status(404).json({ error: 'User not found' });
-        res.json(updatedUser.wishList);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to add to wishlist', details: err.message });
-    }
-});
-
-router.delete('/:bookId/wishlist', async (req, res) => {
-    try {
-        const { userId } = req.body;
-        if (!userId) return res.status(400).json({ error: 'userId is required' });
-
-        const updatedUser = await Users.findByIdAndUpdate(
-            userId,
-            { $pull: { wishList: req.params.bookId } },
-            { new: true }
-        );
-
-        if (!updatedUser) return res.status(404).json({ error: 'User not found' });
-        res.json(updatedUser.wishList);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to remove from wishlist', details: err.message });
-    }
-});
-
+//         res.json(books);
+//     } catch (err) {
+//         res.status(500).json({ error: 'Failed to fetch books by genres', details: err.message });
+//     }
+// });
 
 export default router;

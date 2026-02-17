@@ -25,61 +25,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// retrieve userImageURL by busername// GET /avatarUrl/:username - Retrieve avatar URL by username
-router.get('/avatarUrl/:username', param('username').escape().customSanitizer(sanitizeInput), validateRequest, protect, async (req, res) => {
-    try {
-        const user = await Users.findOne({ username: req.params.username });
-
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        res.json( user.avatarUrl );
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch avatar URL', details: err.message });
-    }
-});
-
-// Get user details by ID or username
-router.get('/details/:identifier', param('identifier').customSanitizer(sanitizeInput), validateRequest, protect, async (req, res) => {
-    try {
-        const { identifier } = req.params;
-        let user;
-
-        // Check if the identifier is a valid MongoDB ObjectId
-        if (mongoose.Types.ObjectId.isValid(identifier)) {
-            user = await Users.findById(identifier);
-        } else {
-            // If not a valid ID, assume it's a username
-            user = await Users.findOne({ username: identifier });
-        }
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Return essential, non-sensitive user data
-        res.json({
-            id: user._id,
-            username: user.username,
-            avatarUrl: user.avatarUrl
-        });
-    } catch (err) {
-        res.status(500).json({ message: 'Server error', error: err.message });
-    }
-});
-
-// GET /users/:id - get profile
-router.get('/:userId', paramValidation.userId, validateRequest, protect, async (req, res) => {
-    try {
-        const user = await Users.findById(req.params.userId);
-        if (!user) return res.status(404).json({ error: 'User not found' });
-
-        res.json(user);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to retrieve user', details: err.message });
-    }
-});
+/// PUBLIC endpoint routes
 
 // GET /users/:id - get profile by username
 router.get('/get-user/:username', param('username').customSanitizer(sanitizeInput), validateRequest, async (req, res) => {
@@ -181,6 +127,70 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
     }
 });
 
+// POST /logout //TODO: update w/ redux????
+router.post('/logout', (req, res) => {
+    res.json({ message: 'Logged out' });
+});
+// retrieve userImageURL by busername// GET /avatarUrl/:username - Retrieve avatar URL by username
+router.get('/avatarUrl/:username', param('username').escape().customSanitizer(sanitizeInput), validateRequest, protect, async (req, res) => {
+    try {
+        const user = await Users.findOne({ username: req.params.username }).select('avatarUrl');
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json( user.avatarUrl );
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch avatar URL', details: err.message });
+    }
+});
+
+
+//// private endpoints
+
+// Get user details by ID or username
+router.get('/details/:identifier', param('identifier').customSanitizer(sanitizeInput), validateRequest, protect, async (req, res) => {
+    try {
+        const { identifier } = req.params;
+        let user;
+
+        // Check if the identifier is a valid MongoDB ObjectId
+        if (mongoose.Types.ObjectId.isValid(identifier)) {
+            user = await Users.findById(identifier);
+        } else {
+            // If not a valid ID, assume it's a username
+            user = await Users.findOne({ username: identifier });
+        }
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Return essential, non-sensitive user data
+        res.json({
+            id: user._id,
+            username: user.username,
+            avatarUrl: user.avatarUrl
+        });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// GET /users/:id - get profile
+router.get('/:userId', paramValidation.userId, validateRequest, protect, async (req, res) => {
+    try {
+        const user = await Users.findById(req.params.userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to retrieve user', details: err.message });
+    }
+});
+
+
 router.post('/change-password', protect, async (req, res) => {
     try {
         const { username, currentPassword, newPassword } = req.body;
@@ -224,12 +234,6 @@ router.post('/change-password', protect, async (req, res) => {
         res.status(500).json({ error: 'Failed to change password', details: err.message });
     }
 });
-
-// POST /logout //TODO: update w/ redux????
-router.post('/logout', (req, res) => {
-    res.json({ message: 'Logged out' });
-});
-
 
 // PUT /users/:id/genres/add-multiple
 router.put('/:userId/genres/add-multiple', paramValidation.userId, validateRequest, protect, async (req, res) => {
