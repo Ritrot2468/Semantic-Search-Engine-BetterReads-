@@ -10,6 +10,9 @@ import Login from './components/Login/Login.jsx'
 import Signup from "./components/Signup/Signup.jsx";
 import NLPSearch from "./pages/NLPSearch.jsx";
 import ChangePasswordPage from "./pages/ChangePasswordPage.jsx";
+import { useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import { verifySession } from './redux/UserThunks.js';
 
 function Layout() {
   const location = useLocation();
@@ -30,13 +33,17 @@ function Layout() {
 }
 
 function App() {
+  const dispatch = useDispatch();
+  useEffect(() => {
+      dispatch(verifySession());
+  }, [])
   return (
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/" element={<Login />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/search" element={<SearchPage />} />
+          <Route path="/" element={<SearchPage />} />
           <Route path="/recommendations" element={<RecommendationsPage />} />
           <Route path="/books/:bookId" element={<BookDetailsPage />} />
           <Route path="/profile" element={<UserProfile />} />

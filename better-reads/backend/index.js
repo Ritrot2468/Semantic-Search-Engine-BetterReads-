@@ -3,6 +3,7 @@ import connectDB from './db.js';
 import cors from 'cors';
 import helmet from 'helmet';
 import xssClean from 'xss-clean';
+import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import reviewRoutes from "./routes/reviews.js";
 import bookRoutes from "./routes/books.js";
@@ -15,6 +16,7 @@ import cookieParser from 'cookie-parser';
 const PORT = process.env.PORT || 3000;
 
 const app = express();
+app.use(cookieParser());
 app.use(express.json());
 
 
@@ -31,7 +33,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-app.use(cookieParser());
+
 // security middleware
 // Configure Helmet with strict CSP and other security headers
 app.use(helmet({
@@ -72,6 +74,7 @@ app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 app.use(xssClean()); // sanitize user input
 
+app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/reviews', reviewRoutes);
 app.use('/books', bookRoutes);

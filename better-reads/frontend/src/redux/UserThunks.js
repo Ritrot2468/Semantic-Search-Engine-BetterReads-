@@ -65,7 +65,8 @@ export const signupUser = createAsyncThunk(
                 console.error('Signup error response:', error);
                 return thunkAPI.rejectWithValue(error.error || error.message || 'Signup failed');
             }
-
+            const signupData = await res.json();
+            localStorage.setItem('token', signupData.token);
             // Step 2: GET full user info
             const profileRes = await apiFetch(`${import.meta.env.VITE_BACKEND_URL}/users/get-user/${username}`);
             if (!profileRes.ok) {
@@ -124,7 +125,26 @@ export const logoutUser = createAsyncThunk('user/logoutUser', async (_, thunkAPI
     return true;
 });
 
+export const verifySession = createAsyncThunk(
+    'user/verifySession',
+    async (_, thunkAPI) => {
+        const token = localStorage.getItem('token');
+        if (!token) return thunkAPI.rejectWithValue('No token');
 
+        const res = await apiFetch(`${import.meta.env.VITE_BACKEND_URL}/auth/verify`);
+
+        if (!res.ok) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            return thunkAPI.rejectWithValue('Invalid session');
+        }
+
+        // Session is valid - rehydrate user from localStorage
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (user) thunkAPI.dispatch(setBooklist(user.wishList || []));
+        return user;
+    }
+);
 // // Logout for cookie session if we want
 // export const logoutUser = createAsyncThunk(
 //     'user/logoutUser',

@@ -25,6 +25,11 @@ const UserCard = ({ user, onChangePassword, onSignOut }) => {
   const handleSignUp = () => {
     navigate('/signup');
   };
+
+  const handleLogin = () => {
+    navigate('/login');
+  };
+  
   const formatDate = (date) => {
     if (!date) return '';
     return new Date(date).toLocaleDateString('en-US', {
@@ -102,7 +107,8 @@ const UserCard = ({ user, onChangePassword, onSignOut }) => {
             )}
 
           {isGuest ? (
-            <Button
+            <div>
+              <Button
               variant="text"
               startIcon={<PersonAddIcon />}
               onClick={handleSignUp}
@@ -116,6 +122,22 @@ const UserCard = ({ user, onChangePassword, onSignOut }) => {
             >
               Sign Up
             </Button>
+            <Button
+              variant="text"
+              startIcon={<PersonAddIcon />}
+              onClick={handleLogin}
+              sx={{
+                fontStyle: 'italic',
+                textTransform: 'none',
+                color: 'text.secondary',
+                p: { xs: '4px 8px', sm: '6px 16px' },
+                fontSize: { xs: '0.8rem', sm: '0.875rem' },
+              }}
+            >
+              Login
+            </Button>
+            </div>
+            
           ) : (
             <Button
               variant="text"

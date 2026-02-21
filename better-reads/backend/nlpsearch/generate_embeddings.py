@@ -13,8 +13,8 @@ FORCE_UPDATE = False  # Set to True to overwrite even if embedding exists
 client = MongoClient(MONGO_URI)
 collection = client[DB_NAME][COLLECTION_NAME]
 
-print(f"Connecting to MongoDB at {MONGO_URI}...")
-print(f"Loading embedding model: {MODEL_NAME}")
+# print(f"Connecting to MongoDB at {MONGO_URI}...")
+# print(f"Loading embedding model: {MODEL_NAME}")
 model = SentenceTransformer(MODEL_NAME)
 
 # === FETCH BOOKS ===

@@ -71,8 +71,18 @@ router.post('/signup', userValidationRules.signup, validateRequest, async (req, 
         });
 
         await newUser.save();
-        const token = jwt.sign({ id: newUser._id, username }, process.env.JWT_SECRET, {
+        const fingerprint = crypto.randomBytes(50).toString('hex');
+        const fingerprintHash = crypto.createHash('sha256').update(fingerprint).digest('hex');
+
+        const token = jwt.sign({ id: newUser._id, username, fgp: fingerprintHash }, process.env.JWT_SECRET, {
             expiresIn: process.env.JWT_EXPIRY
+        });
+
+        res.cookie('__Secure-Fp', fingerprint, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'Lax',
+            path: '/'
         });
         
         // Update the recommender matrix to include the new user
@@ -84,7 +94,7 @@ router.post('/signup', userValidationRules.signup, validateRequest, async (req, 
             // Don't fail the signup if matrix update fails
         }
         
-        res.status(201).json({ message: 'User created', userId: newUser._id , token: token});
+        res.status(201).json({ message: 'User created', userId: newUser._id , token});
     } catch (err) {
         res.status(400).json({ error: 'Failed to create user', details: err.message });
     }
@@ -106,7 +116,7 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
         if (!match ) {
             return res.status(401).json({ error: 'Invalid username or password' });
         }
-        const fingerprint = crypto.randomBytes(50).toString('base64');
+        const fingerprint = crypto.randomBytes(50).toString('hex');
         const fingerprintHash = crypto.createHash('sha256').update(fingerprint).digest('hex');
         const token = jwt.sign({ id: user._id, username, fgp: fingerprintHash }, process.env.JWT_SECRET, {
             expiresIn: process.env.JWT_EXPIRY
@@ -115,8 +125,8 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
         delete userObject.password;
         res.cookie('__Secure-Fp', fingerprint, {
         httpOnly: true,
-        secure: true, // set to true if using HTTPS or in production
-        sameSite: 'Strict',
+        secure: process.env.NODE_ENV === 'production', // set to true if using HTTPS or in production
+        sameSite: 'Lax',
         path: '/'
     });
         res.json({token, user: userObject});
@@ -270,8 +280,9 @@ router.put('/:userId', paramValidation.userId, validateRequest, protect, async (
 });
 
 // PATCH /users/update-wishlist/:id
-router.patch('/update-wishlist/:userId', [paramValidation.userId, ...userValidationRules.addToBooklist], validateRequest, protect, async (req, res) => {
+router.patch('/update-wishlist/:userId', protect, [paramValidation.userId, ...userValidationRules.addToBooklist], validateRequest, async (req, res) => {
     try {
+        console.log("Made it to the route!");
         if (req.user.id !== req.params.userId) {
             return res.status(403).json({ error: 'Forbidden: You can only update your own wishlist' });
         }

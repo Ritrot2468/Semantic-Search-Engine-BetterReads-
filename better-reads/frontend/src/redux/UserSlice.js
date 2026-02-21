@@ -1,6 +1,6 @@
 
 import { createSlice } from '@reduxjs/toolkit';
-import {loginUser, signupUser, fetchUserProfile, logoutUser} from './UserThunks';
+import {loginUser, signupUser, fetchUserProfile, verifySession, logoutUser} from './UserThunks';
 
 
 export const guestUser = {
@@ -69,6 +69,18 @@ const userSlice = createSlice({
                 }
                 state.user = payload;
                 state.isGuest = false;
+            })
+            .addCase(verifySession.fulfilled, (state, action) => {
+                if (action.payload) {
+                    state.user = action.payload;
+                    state.status = 'succeeded';
+                    state.isGuest = false;
+                }
+            })
+            .addCase(verifySession.rejected, (state) => {
+                state.user = guestUser;
+                state.status = 'idle';
+                state.isGuest = true;
             });
     },
 });

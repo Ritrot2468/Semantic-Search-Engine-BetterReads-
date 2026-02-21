@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import {
   TextField,
   Box,
@@ -19,7 +19,6 @@ import { BookPreview } from '../components/Book/BookPreview';
 import '../components/Book/BookPage.css';
 import BookUtils from "../utils/BookUtils.js";
 import { sanitizeContent, sanitizeObject } from '../utils/sanitize';
-
 // const genres = [
 //   "Fantasy", "Fiction", "Nonfiction", "Classics", "Science Fiction",
 //   "Mystery", "Thriller", "Romance", "Historical Fiction", "Horror",
@@ -36,6 +35,7 @@ const SearchPage = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
 
+  
 
   const handleSearch = useCallback(async (pageToFetch = 1, append = false) => {
     // Sanitize search query and genres before sending to API

@@ -18,6 +18,7 @@ export const addToBookListThunk = createAsyncThunk(
             thunkAPI.dispatch(addToBooklist(bookId));
         } catch (err) {
             console.error("Failed to add to wishlist:", err);
+            return thunkAPI.rejectWithValue(err.message);
         }
     }
 );

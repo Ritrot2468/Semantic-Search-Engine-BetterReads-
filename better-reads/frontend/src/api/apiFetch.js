@@ -22,18 +22,20 @@ export const apiFetch = async (endpoint, options = {}) => {
     };
     const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
     console.log(`Sending request to ${endpoint}. Token present: ${!!headers['Authorization']}`);
+   // console.log("Request URL:", `${BASE_URL}/users/update-wishlist/${userId}`);
     const response = await fetch(url, config);
 
     // Handle Global Errors (401 Unauthorized)
     if (response.status === 401) {
         console.error('Security alert or session expired. Redirecting...');
-        localStorage.removeItem('token');
+        // localStorage.removeItem('token');
         
-        // Only redirect if we aren't already on the login page
-        if (!window.location.pathname.includes('/login')) {
-            window.location.href = '/login';
-        }
-        return Promise.reject('Unauthorized');
+        // // Only redirect if we aren't already on the login page
+        // if (!window.location.pathname.includes('/login')) {
+        //     window.location.href = '/login';
+        // }
+        // return Promise.reject('Unauthorized');
+        return response;
     }
 
     return response;

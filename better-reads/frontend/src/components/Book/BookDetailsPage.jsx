@@ -159,6 +159,7 @@ export default function BookDetailsPage() {
         setWishlistLoading(true);
         try {
             const thunk = isInWishlist ? removeFromBookListThunk : addToBookListThunk;
+            console.log("userId : ", userId);
             await dispatch(thunk({ userId, bookId })).unwrap();
             setIsInWishlist(!isInWishlist); // Optimistic update
         } catch (error) {

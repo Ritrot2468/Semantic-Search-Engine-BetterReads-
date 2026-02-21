@@ -24,7 +24,7 @@ const Login = () => {
 			const sanitizedUsername = sanitizeContent(username);
 			const sanitizedPassword = sanitizeContent(password);
 			await dispatch(loginUser({ username: sanitizedUsername, password: sanitizedPassword })).unwrap();
-			navigate('/search');
+			navigate('/');
 		} catch (err) {
 			setLoginError(err.error);
 
