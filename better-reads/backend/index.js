@@ -16,9 +16,6 @@ import cookieParser from 'cookie-parser';
 const PORT = process.env.PORT || 3000;
 
 const app = express();
-app.use(cookieParser());
-app.use(express.json());
-
 
 // Configure CORS with restrictive settings
 const corsOptions = {
@@ -26,7 +23,7 @@ const corsOptions = {
     ? ['https://betterreads.com', 'https://www.betterreads.com'] // Restrict to production domains
     : ['http://localhost:3000', 'http://localhost:5173'], // Allow local development
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   credentials: true,
   maxAge: 86400 // 24 hours
 };
@@ -52,7 +49,8 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: { policy: "require-corp" },
   crossOriginOpenerPolicy: { policy: "same-origin" },
-  crossOriginResourcePolicy: { policy: "same-origin" },
+  // NOTE FOR HELENA: had to change this to "cross-origin" to allow embedding book cover images from openlibrary.org, but this may have security implications. We should review this setting before production deployment.
+  crossOriginResourcePolicy: { policy: "cross-origin" },
   referrerPolicy: { policy: "strict-origin-when-cross-origin" },
   // Set X-Frame-Options header to prevent clickjacking
   frameguard: { action: 'deny' },
@@ -61,6 +59,10 @@ app.use(helmet({
   // Prevent MIME-type sniffing
   noSniff: true,
 }));
+
+app.use(cookieParser());
+app.use(express.json());
+app.options('*', cors(corsOptions));
 
 // Disable X-Powered-By header to prevent information disclosure
 app.disable('x-powered-by');
@@ -73,7 +75,10 @@ const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 app.use(xssClean()); // sanitize user input
-
+app.use((req, res, next) => {
+  console.log(`${req.method} request to ${req.url}`);
+  next();
+});
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/reviews', reviewRoutes);

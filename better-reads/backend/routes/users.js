@@ -13,7 +13,7 @@ import crypto from 'crypto';
 import { protect } from '../middleware/authentification.js';
 
 const router = express.Router();
-
+const isProd = process.env.NODE_ENV === 'production';
 //TODO: add pagination?
 // GET all users (for admin/testing)
 router.get('/', async (req, res) => {
@@ -78,13 +78,13 @@ router.post('/signup', userValidationRules.signup, validateRequest, async (req, 
             expiresIn: process.env.JWT_EXPIRY
         });
 
-        res.cookie('__Secure-Fp', fingerprint, {
+        res.cookie(isProd ? '__Secure-Fp' : 'fp', fingerprint, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'Lax',
-            path: '/'
+            secure: isProd,       // false on localhost
+            sameSite: isProd ? 'none' : 'lax', // 'none' requires secure: true
+            path: '/',
+            maxAge: 7 * 24 * 60 * 60 * 1000
         });
-        
         // Update the recommender matrix to include the new user
         try {
             await axios.post('http://recommender:5001/update-matrix');
@@ -123,12 +123,14 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
         });
         const userObject = user.toObject();
         delete userObject.password;
-        res.cookie('__Secure-Fp', fingerprint, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // set to true if using HTTPS or in production
-        sameSite: 'Lax',
-        path: '/'
-    });
+        
+           res.cookie(isProd ? '__Secure-Fp' : 'fp', fingerprint, {
+            httpOnly: true,
+            secure: isProd,       // false on localhost
+            sameSite: isProd ? 'none' : 'lax', // 'none' requires secure: true
+            path: '/',
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
         res.json({token, user: userObject});
         
         //res.json({ message: 'Login successful', userId: user._id });
@@ -280,7 +282,7 @@ router.put('/:userId', paramValidation.userId, validateRequest, protect, async (
 });
 
 // PATCH /users/update-wishlist/:id
-router.patch('/update-wishlist/:userId', protect, [paramValidation.userId, ...userValidationRules.addToBooklist], validateRequest, async (req, res) => {
+router.patch('/update-wishlist/:userId', [paramValidation.userId, ...userValidationRules.addToBooklist], validateRequest, protect, async (req, res) => {
     try {
         console.log("Made it to the route!");
         if (req.user.id !== req.params.userId) {
