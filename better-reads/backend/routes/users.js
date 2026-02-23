@@ -11,7 +11,7 @@ import { userValidationRules, validateRequest, sanitizeInput, paramValidation } 
 import { param } from 'express-validator';
 import crypto from 'crypto';
 import { protect } from '../middleware/authentification.js';
-import { storeInRedis } from '../services/redisClient.js';
+import { storeInRedis, getFromRedis } from '../services/redisClient.js';
 import { getRecommendations } from '../services/recommendations.js';
 
 
