@@ -241,8 +241,8 @@ export default function BookDetailsPage() {
                                     const sanitizedReview = sanitizeObject(newReview);
                                     setUserReview(sanitizedReview);
                                     setBookReviews(prev => {
-                                        const others = prev.filter(r => r.userId?.username !== username);
-                                        return [sanitizedReview, ...others];
+                                        return prev.filter(r => r.userId?.username !== username);
+                                       
                                     });
                                     setIsEditing(false);
                                 } catch(err) {

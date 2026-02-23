@@ -15,9 +15,15 @@ const BookUtils = {
         return data.genres || [];
     },
 
+    async fetchFromGateway (searchParams) {
+        const response = await fetch(`${BASE_URL}/books/search-gateway?${searchParams.toString()}`);
+        if (!response.ok) throw new Error('Network response was not ok');
+        return await response.json();
+    },
+
     // Search for books by query (title, author, genre, etc.)
     //TODO: decide on page/limit
-    async searchBooks({ q = '', genres = [], page = 1, limit = 10 } = {}) {
+    async searchBooks({ q = '', genres = [], min_year = null, max_year = null, page = 1, limit = 10 } = {}) {
         const params = new URLSearchParams();
 
         if (q.trim()) {
@@ -27,29 +33,38 @@ const BookUtils = {
         if (Array.isArray(genres) && genres.length > 0) {
             params.append('genre', genres.join(','));
         }
-
+        if (min_year) params.append('min_year', min_year);
+        if (max_year) params.append('max_year', max_year);
         params.append('page', page);
         params.append('limit', limit);
 
-        const queryString = params.toString();
-        console.log("query: ", queryString);
-        const res = await apiFetch(`${BASE_URL}/books/genre-search?${queryString}`);
+        // const queryString = params.toString();
+        // console.log("query: ", queryString);
+        // const res = await apiFetch(`${BASE_URL}/books/genre-search?${queryString}`);
 
-        if (!res.ok) {
-            const error = await res.json().catch(() => ({}));
-            throw new Error(error?.error || 'Failed to main.py books');
-        }
+        // if (!res.ok) {
+        //     const error = await res.json().catch(() => ({}));
+        //     throw new Error(error?.error || 'Failed to main.py books');
+        // }
 
-        const data = await res.json();
-
+        // const data = await res.json();
+        const data = await this.fetchFromGateway(params);
         return {
-            results: data.results,
-            page: data.page,
-            totalPages: data.totalPages,
-            totalResults: data.totalResults
+            results: data.results || data,
+            page: data.page || page,
+            totalPages: data.totalPages || 1,
+            totalResults: data.totalResults || (data.length || 0)
         };
     },
 
+    async handleManualSearch(query) {
+        return await this.searchBooks({ q: query });
+    },
+
+    async handleNLPSearch(naturalLanguageQuery) {
+        return await this.searchBooks({ q: naturalLanguageQuery });
+    },    
+   
     async updateWishlist(bookId, userId, operation) {
         const res = await apiFetch(`${BASE_URL}/users/update-wishlist/${userId}`, {
             method: 'PATCH',

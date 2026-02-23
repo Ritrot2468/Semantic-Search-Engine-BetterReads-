@@ -7,6 +7,7 @@ import YearSelection from '../components/NLPSearch/YearSelection';
 import { TextField } from '@mui/material';
 import { BookPreview } from "../components/Book/BookPreview";
 import { sanitizeContent, sanitizeObject } from '../utils/sanitize';
+import BookUtils from '../utils/BookUtils';
 
 const NLPSearch = () => {
     const [genre, setGenre] = useState([]);
@@ -35,16 +36,18 @@ const NLPSearch = () => {
         if (sanitizedStartYear) params.append('min_year', sanitizedStartYear);
         if (sanitizedEndYear) params.append('max_year', sanitizedEndYear);
 
-        const response = await fetch(`http://localhost:5002/search?${params.toString()}`);
-        const contentType = response.headers.get('content-type');
+        //const response = await fetch(`books//search?${params.toString()}`);
+        const data = await BookUtils.fetchFromGateway(params);
+        // const contentType = response.headers.get('content-type');
 
-        if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Response is not valid JSON');
-        }
-        const data = await response.json();
-        // Sanitize the results before setting state
-        const sanitizedResults = sanitizeObject(data);
-        setResults(sanitizedResults);
+        // if (!contentType || !contentType.includes('application/json')) {
+        // throw new Error('Response is not valid JSON');
+        // }
+        const rawResults = data.results || data;
+
+        // 4. Sanitize and Set State
+        const cleanResults = Array.isArray(rawResults) ? sanitizeObject(rawResults) : [];
+        setResults(cleanResults);
     } catch (err) {
         console.error('Search failed:', err);
     } finally {
@@ -145,8 +148,8 @@ const NLPSearch = () => {
                 justifyContent: 'space-between',
                 borderRadius: 2,
               }}
-            >
-              <Typography
+            > 
+              {book.score && (<Typography
                 variant="caption"
                 sx={{
                   mb: 1,
@@ -160,7 +163,7 @@ const NLPSearch = () => {
               >
                 Match Score: {book.score ? `${(book.score * 100).toFixed(2)}%` : null}
               </Typography>
-
+              )}
               <BookPreview
                 bookId={book._id}
                 coverUrl={book.image}

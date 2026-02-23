@@ -83,8 +83,9 @@ app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/reviews', reviewRoutes);
 app.use('/books', bookRoutes);
-app.use('/recommendations', recommendationsRoutes);
 app.use('/nlp', nlpRoutes);
+app.use('/recommendations', recommendationsRoutes);
+
 
 // The "catchall" handler: for any request that doesn't match one above, throw a 404 error.
 app.get('*', (req, res) => {

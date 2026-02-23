@@ -11,6 +11,9 @@ import { userValidationRules, validateRequest, sanitizeInput, paramValidation } 
 import { param } from 'express-validator';
 import crypto from 'crypto';
 import { protect } from '../middleware/authentification.js';
+import { storeInRedis } from '../services/redisClient.js';
+import { getRecommendations } from '../services/recommendations.js';
+
 
 const router = express.Router();
 const isProd = process.env.NODE_ENV === 'production';
@@ -116,15 +119,25 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
         if (!match ) {
             return res.status(401).json({ error: 'Invalid username or password' });
         }
+        /// Generate a secure random fingerprint and hash it
         const fingerprint = crypto.randomBytes(50).toString('hex');
         const fingerprintHash = crypto.createHash('sha256').update(fingerprint).digest('hex');
+       
+        // Check if this fingerprint hash is blacklisted (e.g., from a previous logout)
+        const isBlacklisted = await getFromRedis(`blacklist:fp:${fingerprintHash}`);
+        if (isBlacklisted) {
+            // Force a new fingerprint if there's a collision
+            return res.status(500).json({ error: "Security collision, try again." });
+        }
+
+        // Create JWT with user ID, username, and fingerprint hash
         const token = jwt.sign({ id: user._id, username, fgp: fingerprintHash }, process.env.JWT_SECRET, {
             expiresIn: process.env.JWT_EXPIRY
         });
         const userObject = user.toObject();
         delete userObject.password;
         
-           res.cookie(isProd ? '__Secure-Fp' : 'fp', fingerprint, {
+        res.cookie(isProd ? '__Secure-Fp' : 'fp', fingerprint, {
             httpOnly: true,
             secure: isProd,       // false on localhost
             sameSite: isProd ? 'none' : 'lax', // 'none' requires secure: true
@@ -132,7 +145,10 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
         res.json({token, user: userObject});
-        
+        console.log(`Warming recommendation cache for: ${username}`);
+        getRecommendations(username).catch(err => {
+            console.error("Non-blocking Cache Warming Error:", err.message);
+        });
         //res.json({ message: 'Login successful', userId: user._id });
     } catch (err) {
         res.status(500).json({ error: 'Login failed', details: err.message });
@@ -140,8 +156,17 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
 });
 
 // POST /logout //TODO: update w/ redux????
-router.post('/logout', (req, res) => {
-    res.json({ message: 'Logged out' });
+router.post('/logout', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    const fpKey = getFingerprintKey(req);
+
+    if (token) await storeInRedis(`blacklist:token:${token}`, { status: 'revoked' }, 3600);
+    if (fpKey) await storeInRedis(fpKey, { status: 'revoked' }, 3600);
+
+    // Clear whatever cookie exists
+    res.clearCookie('__Secure-Fp');
+    res.clearCookie('fp');
+    res.status(200).json({ message: 'Logged out' });
 });
 // retrieve userImageURL by busername// GET /avatarUrl/:username - Retrieve avatar URL by username
 router.get('/avatarUrl/:username', param('username').escape().customSanitizer(sanitizeInput), validateRequest, protect, async (req, res) => {

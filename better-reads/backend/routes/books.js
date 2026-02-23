@@ -5,6 +5,7 @@ import Users from "../model/users.js";
 import axios from 'axios';
 import { protect } from '../middleware/authentification.js';
 import { validateRequest, queryValidation, paramValidation, reviewValidationRules } from '../middleware/validators.js';
+import { deleteFromRedis } from '../services/redisClient.js';
 const router = express.Router();
 
 
@@ -100,6 +101,19 @@ router.get('/genre-search', queryValidation.search, validateRequest, async (req,
     }
 });
 
+router.get('/search-gateway', async (req, res) => {
+    const { q} = req.query;
+
+    // 1. If no semantic query, use the local MongoDB Regex/Genre engine
+    if (!q || !q.trim()) {
+      
+        return res.redirect(307, `/books/genre-search?${new URLSearchParams(req.query).toString()}`);
+    }
+
+    // 2. If semantic query exists, redirect to the NLP search microservice which will handle both semantic and genre searching
+    return res.redirect(307, `/nlp/search?${new URLSearchParams(req.query).toString()}`);
+   
+});
 
 // GET /books/popular - Get popular books sorted by average rating
 router.get('/popular', async (req, res) => {
@@ -172,8 +186,9 @@ router.post('/:bookId/reviews', [paramValidation.bookId, ...reviewValidationRule
                 { new: true, upsert: true, runValidators: true }
             ).populate('userId', 'username avatarUrl');
             
-            // Update the recommender matrix
+            // Update the recommender matrix and remove the user's old recommendations from Redis to ensure they get updated recommendations based on the new review 
             try {
+                await deleteFromRedis(`recs:user:${username}`);
                 await axios.post('http://recommender:5001/update-matrix');
                 console.log('Recommender matrix updated after review update');
             } catch (updateError) {
@@ -208,6 +223,7 @@ router.post('/:bookId/reviews', [paramValidation.bookId, ...reviewValidationRule
         
         // Update the recommender matrix
         try {
+            await deleteFromRedis(`recs:user:${username}`);
             await axios.post('http://recommender:5001/update-matrix');
             console.log('Recommender matrix updated after new review');
         } catch (updateError) {

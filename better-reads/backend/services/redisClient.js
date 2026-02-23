@@ -64,8 +64,24 @@ async function storeInRedis(key, data, expirationSeconds = 3600) {
   }
 }
 
+// for authentication: store blacklisted tokens and fingerprint keys
+const getFingerprintKey = (req) => {
+  // Check production name first, then dev name
+  const fingerprint = req.cookies['__Secure-Fp'] || req.cookies['fp'];
+  return fingerprint ? `blacklist:fp:${fingerprint}` : null;
+};
+
+async function deleteFromRedis(key) {
+  try {
+    await redisClient.del(key);
+    return true;
+  } catch (error) {
+    console.error(`Error deleting ${key} from Redis:`, error);
+    return false;
+  }
+}
 const disconnectRedis = () => {
   redisClient.quit();
 };
 
-export { redisClient, disconnectRedis, getFromRedis, storeInRedis };
+export { redisClient, disconnectRedis, getFromRedis, storeInRedis, getFingerprintKey, deleteFromRedis };

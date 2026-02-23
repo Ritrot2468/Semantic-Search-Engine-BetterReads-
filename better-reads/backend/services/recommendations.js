@@ -5,7 +5,7 @@ import Review from '../model/reviews.js';
 import { getFromRedis, storeInRedis } from './redisClient.js';
 
 /**
- * Get personalized book recommendations for a user
+ * Get personalized book recommendations for a user and store query results to redis cache
  * @param {string} fn_username - The username of the user to get recommendations for
  * @returns {Promise<Array>} - Array of recommended book objects
  */
@@ -16,6 +16,16 @@ async function getRecommendations(fn_username) {
     
     if (!user) {
       throw new Error(`User with username ${fn_username} not found`);
+    }
+
+    // check if user recommendations are already cached in Redis
+    const USER_REC_CACHE_KEY = `recs:user:${fn_username}`;
+    const cachedUserRecs = await getFromRedis(USER_REC_CACHE_KEY);
+    
+    if (cachedUserRecs) {
+      console.log(`Cache Hit: Returning stored recommendations for ${fn_username}`);
+      // We still fetch full book details from Mongo because Redis usually stores just IDs or light JSON
+      return await Book.find({ _id: { $in: cachedUserRecs.map(b => b._id) } }).exec();
     }
 
     // For backward compatibility, we'll still check if the matrix exists in Redis
@@ -64,6 +74,9 @@ async function getRecommendations(fn_username) {
       filteredApiRecs
     );
 
+    // Cache this specific result for 30 minutes (1800s)
+    await storeInRedis(USER_REC_CACHE_KEY, combinedRecommendations, 1800);
+
     return combinedRecommendations;
   } catch (error) {
     console.error('Error in getRecommendations:', error);
@@ -72,10 +85,14 @@ async function getRecommendations(fn_username) {
   }
 }
 
+// async function getInteractedBookIds(userId) {
+//   const reviews = await Review.find({ userId }).exec();
+//   console.log(reviews);
+//   return reviews.map(review => review.bookId);
+// }
 async function getInteractedBookIds(userId) {
-  const reviews = await Review.find({ userId }).exec();
-  console.log(reviews);
-  return reviews.map(review => review.bookId);
+  // Returns just an array of IDs directly from MongoDB indexes
+  return await Review.distinct('bookId', { userId });
 }
 
 /**

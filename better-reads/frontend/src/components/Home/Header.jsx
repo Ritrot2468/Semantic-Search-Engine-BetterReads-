@@ -32,7 +32,7 @@ const Header = ({ userAvatar }) => {
   return (
     <AppBar position="sticky" sx={{ backgroundColor: NoirNavy, padding: '5px 0' }}>
       <Toolbar sx={{ justifyContent: 'space-between' }}>
-        <RouterLink to="/search">
+        <RouterLink to="/">
           <Box
             component="img"
             src={BetterReadsLogo}
@@ -64,7 +64,7 @@ const Header = ({ userAvatar }) => {
                 },
               }}
             >
-              <MenuItem component={RouterLink} to="/search" onClick={handleMenuClose}>Search</MenuItem>
+              <MenuItem component={RouterLink} to="/" onClick={handleMenuClose}>Search</MenuItem>
               <MenuItem component={RouterLink} to="/recommendations" onClick={handleMenuClose}>Recommendations</MenuItem>
               <MenuItem component={RouterLink} to="/nlpsearch" onClick={handleMenuClose}>AI Match</MenuItem>
               <MenuItem component={RouterLink} to="/profile" onClick={handleMenuClose}>Profile</MenuItem>
@@ -72,7 +72,7 @@ const Header = ({ userAvatar }) => {
           </>
         ) : (
           <Box sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Button color="inherit" component={RouterLink} to="/search">
+            <Button color="inherit" component={RouterLink} to="/">
               Search
             </Button>
             <Button color="inherit" component={RouterLink} to="/recommendations">

@@ -160,7 +160,7 @@ const ChangePasswordPage = () => {
             }
             
             await UserUtils.changeUserPassword(user.username, sanitizedOldPassword, sanitizedNewPassword);
-            navigate('/search');
+            navigate('/');
         } catch (err) {
             setError(err.message || 'An error occurred while changing password');
             console.error('Password change error:', err);

@@ -86,7 +86,7 @@ const Signup = () => {
 			}));
 
 			if (signupUser.fulfilled.match(result)) {
-				navigate('/search');
+				navigate('/');
 			} else {
 				setSignupError(result.payload);
 			}

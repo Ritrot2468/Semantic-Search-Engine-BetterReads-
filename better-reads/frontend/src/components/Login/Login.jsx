@@ -86,7 +86,7 @@ const Login = () => {
 								// Set guest user in localStorage - no need to sanitize as we're creating this object
 								localStorage.setItem('user', JSON.stringify({ isGuest: true }));
 								localStorage.removeItem('appState');
-								navigate("/search");
+								navigate("/");
 							}}
 						>
 							Enter as a Guest

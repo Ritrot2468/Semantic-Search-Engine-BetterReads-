@@ -60,7 +60,7 @@ def add_embeddings(book_isbn: str):
 
 @app.get("/search")
 def search_books(
-    q: str,
+    q: Optional[str] = None,
     genre: Optional[list[str]] = Query(default=[]),
     min_year: Optional[int] = None,
     max_year: Optional[int] = None
