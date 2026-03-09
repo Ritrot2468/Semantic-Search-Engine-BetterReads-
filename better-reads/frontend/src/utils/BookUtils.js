@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_BACKEND_URL;
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 import { apiFetch } from '../api/apiFetch.js';
 
 const BookUtils = {
@@ -16,7 +16,7 @@ const BookUtils = {
     },
 
     async fetchFromGateway (searchParams) {
-        const response = await fetch(`${BASE_URL}/books/search-gateway?${searchParams.toString()}`);
+        const response = await apiFetch(`${BASE_URL}/books/search-gateway?${searchParams.toString()}`);
         if (!response.ok) throw new Error('Network response was not ok');
         return await response.json();
     },

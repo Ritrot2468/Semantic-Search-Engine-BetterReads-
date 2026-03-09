@@ -6,6 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+# Copy application code (exclude .env files via .dockerignore)
 COPY . .
 
 EXPOSE 3000

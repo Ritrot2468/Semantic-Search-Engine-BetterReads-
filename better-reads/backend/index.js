@@ -9,6 +9,7 @@ import reviewRoutes from "./routes/reviews.js";
 import bookRoutes from "./routes/books.js";
 import recommendationsRoutes from "./routes/recommendations.js";
 import nlpRoutes from "./routes/nlptextsearch.js";
+import { generalLimiter, authLimiter } from './middleware/rateLimiter.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
@@ -75,17 +76,17 @@ const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 app.use(xssClean()); // sanitize user input
+app.use(generalLimiter); // Apply general rate limiting
 app.use((req, res, next) => {
   console.log(`${req.method} request to ${req.url}`);
   next();
 });
-app.use('/auth', authRoutes);
+app.use('/auth', authLimiter, authRoutes); // Stricter rate limiting for auth
 app.use('/users', userRoutes);
 app.use('/reviews', reviewRoutes);
 app.use('/books', bookRoutes);
 app.use('/nlp', nlpRoutes);
 app.use('/recommendations', recommendationsRoutes);
-
 
 // The "catchall" handler: for any request that doesn't match one above, throw a 404 error.
 app.get('*', (req, res) => {

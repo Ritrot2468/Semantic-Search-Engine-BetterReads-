@@ -1,6 +1,6 @@
 import BookUtils from "./BookUtils.js";
 import { apiFetch } from '../api/apiFetch.js';
-const BASE_URL = import.meta.env.VITE_BACKEND_URL;
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const UserUtils = {
     async changeUserPassword(username, oldPassword, newPassword) {

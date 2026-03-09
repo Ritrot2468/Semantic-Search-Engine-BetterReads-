@@ -52,7 +52,7 @@ const RecommendationsPage = () => {
         }
         
         // Use the recommendations endpoint
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+        const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
         const url = `${backendUrl}/recommendations/${username}`;
         console.log('Fetching recommendations from:', url);
         
@@ -88,7 +88,7 @@ const RecommendationsPage = () => {
   useEffect(() => {
     const fetchPopularBooks = async () => {
       try {
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+        const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
         const res = await fetch(`${backendUrl}/books/popular`);
         if (!res.ok) throw new Error('Failed to fetch popular books');
         const data = await res.json();

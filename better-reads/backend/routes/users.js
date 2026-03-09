@@ -19,7 +19,7 @@ const router = express.Router();
 const isProd = process.env.NODE_ENV === 'production';
 //TODO: add pagination?
 // GET all users (for admin/testing)
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
     try {
         const users = await Users.find().select('-password'); // Exclude passwords
         res.json(users);
@@ -30,10 +30,11 @@ router.get('/', async (req, res) => {
 
 /// PUBLIC endpoint routes
 
-// GET /users/:id - get profile by username
+// GET /users/:id - get public profile by username (safe fields only)
 router.get('/get-user/:username', param('username').customSanitizer(sanitizeInput), validateRequest, async (req, res) => {
     try {
-        const user = await Users.findOne({username: req.params.username});
+        const user = await Users.findOne({ username: req.params.username })
+            .select('username avatarUrl favoriteGenres join_time');
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         res.json(user);
@@ -78,7 +79,7 @@ router.post('/signup', userValidationRules.signup, validateRequest, async (req, 
         const fingerprintHash = crypto.createHash('sha256').update(fingerprint).digest('hex');
 
         const token = jwt.sign({ id: newUser._id, username, fgp: fingerprintHash }, process.env.JWT_SECRET, {
-            expiresIn: process.env.JWT_EXPIRY
+            expiresIn: process.env.JWT_EXPIRY || '7d'
         });
 
         res.cookie(isProd ? '__Secure-Fp' : 'fp', fingerprint, {
@@ -97,7 +98,9 @@ router.post('/signup', userValidationRules.signup, validateRequest, async (req, 
             // Don't fail the signup if matrix update fails
         }
         
-        res.status(201).json({ message: 'User created', userId: newUser._id , token});
+        const userObject = newUser.toObject();
+        delete userObject.password;
+        res.status(201).json({ message: 'User created', userId: newUser._id, token, user: userObject });
     } catch (err) {
         res.status(400).json({ error: 'Failed to create user', details: err.message });
     }
@@ -158,10 +161,12 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
 // POST /logout //TODO: update w/ redux????
 router.post('/logout', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
-    const fpKey = getFingerprintKey(req);
-
     if (token) await storeInRedis(`blacklist:token:${token}`, { status: 'revoked' }, 3600);
-    if (fpKey) await storeInRedis(fpKey, { status: 'revoked' }, 3600);
+    const fp = req.cookies['__Secure-Fp'] || req.cookies['fp'];
+    if (fp) {
+        const fpHash = crypto.createHash('sha256').update(fp).digest('hex');
+        await storeInRedis(`blacklist:fp:${fpHash}`, { status: 'revoked' }, 3600);
+    }
 
     // Clear whatever cookie exists
     res.clearCookie('__Secure-Fp');
@@ -218,7 +223,11 @@ router.get('/details/:identifier', param('identifier').customSanitizer(sanitizeI
 // GET /users/:id - get profile
 router.get('/:userId', paramValidation.userId, validateRequest, protect, async (req, res) => {
     try {
-        const user = await Users.findById(req.params.userId);
+        if (req.user.id !== req.params.userId) {
+            return res.status(403).json({ error: 'Forbidden: You can only access your own profile' });
+        }
+
+        const user = await Users.findById(req.params.userId).select('-password');
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         res.json(user);
@@ -275,6 +284,10 @@ router.post('/change-password', protect, async (req, res) => {
 // PUT /users/:id/genres/add-multiple
 router.put('/:userId/genres/add-multiple', paramValidation.userId, validateRequest, protect, async (req, res) => {
     try {
+        if (req.user.id !== req.params.userId) {
+            return res.status(403).json({ error: 'Forbidden: You can only update your own genres' });
+        }
+
         const { genres } = req.body;
 
         if (!Array.isArray(genres) || genres.length === 0) {
@@ -288,7 +301,9 @@ router.put('/:userId/genres/add-multiple', paramValidation.userId, validateReque
         );
 
         if (!updated) return res.status(404).json({ error: 'User not found' });
-        res.json(updated);
+        const updatedSafe = updated.toObject();
+        delete updatedSafe.password;
+        res.json(updatedSafe);
     } catch (err) {
         res.status(400).json({ error: 'Failed to add genres', details: err.message });
     }
@@ -297,10 +312,22 @@ router.put('/:userId/genres/add-multiple', paramValidation.userId, validateReque
 // PUT /users/:id - update a total user
 router.put('/:userId', paramValidation.userId, validateRequest, protect, async (req, res) => {
     try {
-        const updated = await Users.findByIdAndUpdate(req.params.userId, req.body, { new: true });
+        if (req.user.id !== req.params.userId) {
+            return res.status(403).json({ error: 'Forbidden: You can only update your own account' });
+        }
+
+        // Whitelist updatable fields to avoid mass assignment
+        const { avatarUrl, favoriteGenres } = req.body;
+        const update = {};
+        if (avatarUrl !== undefined) update.avatarUrl = avatarUrl;
+        if (favoriteGenres !== undefined) update.favoriteGenres = favoriteGenres;
+
+        const updated = await Users.findByIdAndUpdate(req.params.userId, update, { new: true });
         if (!updated) return res.status(404).json({ error: 'User not found' });
 
-        res.json(updated);
+        const updatedSafe = updated.toObject();
+        delete updatedSafe.password;
+        res.json(updatedSafe);
     } catch (err) {
         res.status(400).json({ error: 'Failed to update user', details: err.message });
     }
@@ -333,7 +360,9 @@ router.patch('/update-wishlist/:userId', [paramValidation.userId, ...userValidat
         }
 
         await user.save();
-        res.json(user);
+        const userSafe = user.toObject();
+        delete userSafe.password;
+        res.json(userSafe);
     } catch (err) {
         res.status(400).json({ error: 'Failed to update wishlist', details: err.message });
     }
@@ -343,6 +372,10 @@ router.patch('/update-wishlist/:userId', [paramValidation.userId, ...userValidat
 // DELETE /users/:id - delete user (optional/admin)
 router.delete('/:userId', paramValidation.userId, validateRequest, protect, async (req, res) => {
     try {
+        if (req.user.id !== req.params.userId) {
+            return res.status(403).json({ error: 'Forbidden: You can only delete your own account' });
+        }
+
         const deleted = await Users.findByIdAndDelete(req.params.userId);
         if (!deleted) return res.status(404).json({ error: 'User not found' });
 

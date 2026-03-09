@@ -27,3 +27,5 @@ wheels/
 .installed.cfg
 *.egg
 PYTHONPATH
+.env
+.env.test

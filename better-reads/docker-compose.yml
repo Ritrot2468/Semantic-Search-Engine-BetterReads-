@@ -42,7 +42,7 @@ services:
       - recommender
       - nlpsearch
     environment:
-      - MONGO_URI=mongodb://root:rootpassword@mongodb:27017/betterreads?authSource=admin
+      - MONGO_URI=mongodb+srv://rex015:iDPU4rvt5HjtDrW1@sandbox.bcebozm.mongodb.net/bookdb?retryWrites=true&w=majority&appName=Sandbox
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
@@ -78,7 +78,7 @@ services:
       - mongodb
       - redis
     environment:
-      - MONGO_URI=mongodb://root:rootpassword@mongodb:27017/betterreads?authSource=admin
+      - MONGO_URI=mongodb+srv://rex015:iDPU4rvt5HjtDrW1@sandbox.bcebozm.mongodb.net/bookdb?retryWrites=true&w=majority&appName=Sandbox
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0

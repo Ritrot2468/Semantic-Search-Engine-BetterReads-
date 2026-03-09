@@ -1,5 +1,4 @@
-const BASE_URL = import.meta.env.VITE_BACKEND_URL;
-
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 export const apiFetch = async (endpoint, options = {}) => {
     // 1. Prepare Headers
     const headers = {
@@ -21,7 +20,6 @@ export const apiFetch = async (endpoint, options = {}) => {
         credentials: 'include', 
     };
     const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
-    console.log(`Sending request to ${endpoint}. Token present: ${!!headers['Authorization']}`);
    // console.log("Request URL:", `${BASE_URL}/users/update-wishlist/${userId}`);
     const response = await fetch(url, config);
 

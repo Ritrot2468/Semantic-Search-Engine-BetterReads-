@@ -10,7 +10,7 @@ export const loginUser = createAsyncThunk(
     async ({ username, password}, thunkAPI) => {
         try {
 
-            const res = await apiFetch(`${import.meta.env.VITE_BACKEND_URL}/users/login`, {
+            const res = await apiFetch(`${import.meta.env.VITE_API_BASE_URL}/users/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -44,17 +44,8 @@ export const signupUser = createAsyncThunk(
             //const state = getState();
             const wishList  = thunkAPI.getState().booklist.items;
             
-            // Debug logs
-            console.log("Signup Request Data:", { 
-                username, 
-                passwordLength: password?.length,
-                favoriteGenres, 
-                wishList,
-                backendUrl: import.meta.env.VITE_BACKEND_URL
-            });
-            
             // Step 1: POST to /signup
-            const res = await apiFetch(`${import.meta.env.VITE_BACKEND_URL}/users/signup`, {
+            const res = await apiFetch(`${import.meta.env.VITE_API_BASE_URL}/users/signup`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password, favoriteGenres, wishList }),
@@ -67,21 +58,9 @@ export const signupUser = createAsyncThunk(
             }
             const signupData = await res.json();
             localStorage.setItem('token', signupData.token);
-            // Step 2: GET full user info
-            const profileRes = await apiFetch(`${import.meta.env.VITE_BACKEND_URL}/users/get-user/${username}`);
-            if (!profileRes.ok) {
-                const error = await profileRes.json();
-                return thunkAPI.rejectWithValue(error.message || 'Failed to fetch profile');
-            }
-
-            const user = await profileRes.json();
-            
-            // Store user data in localStorage after signup
+            const user = signupData.user;
             localStorage.setItem('user', JSON.stringify(user));
-            console.log('User data stored in localStorage after signup:', user);
-            
             thunkAPI.dispatch(setBooklist(user.wishList || []));
-
             return user;
         } catch (err) {
             return thunkAPI.rejectWithValue(err);
@@ -94,7 +73,7 @@ export const fetchUserProfile = createAsyncThunk(
     'user/fetchUserProfile',
     async (userId, thunkAPI) => {
         try {
-            const res = await apiFetch(`${import.meta.env.VITE_BACKEND_URL}/users/${userId}`, {
+            const res = await apiFetch(`${import.meta.env.VITE_API_BASE_URL}/users/${userId}`, {
                 credentials: 'include',
             });
 
@@ -131,7 +110,7 @@ export const verifySession = createAsyncThunk(
         const token = localStorage.getItem('token');
         if (!token) return thunkAPI.rejectWithValue('No token');
 
-        const res = await apiFetch(`${import.meta.env.VITE_BACKEND_URL}/auth/verify`);
+        const res = await apiFetch(`${import.meta.env.VITE_API_BASE_URL}/auth/verify`);
 
         if (!res.ok) {
             localStorage.removeItem('token');
@@ -150,7 +129,7 @@ export const verifySession = createAsyncThunk(
 //     'user/logoutUser',
 //     async (_, thunkAPI) => {
 //         try {
-//             await fetch(`${import.meta.env.VITE_BACKEND_URL}/users/logout`, {
+//             await fetch(`${import.meta.env.VITE_API_BASE_URL}/users/logout`, {
 //                 method: 'POST',
 //                 credentials: 'include',
 //             });

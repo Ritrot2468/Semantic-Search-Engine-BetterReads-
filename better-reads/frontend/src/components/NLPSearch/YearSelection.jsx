@@ -63,7 +63,6 @@ const YearSelection = ({ fromYear, toYear, onChangeFrom, onChangeTo }) => {
           ))}
         </Select>
       </FormControl>
-     _
       <FormControl sx={{ width: '100%' }}>
         <Select
           value={toYear}

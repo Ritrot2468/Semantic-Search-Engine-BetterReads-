@@ -7,7 +7,7 @@ import { protect } from '../middleware/authentification.js';
 import { validateRequest, queryValidation, paramValidation, reviewValidationRules } from '../middleware/validators.js';
 import { deleteFromRedis } from '../services/redisClient.js';
 const router = express.Router();
-
+import { handleGenreSearch } from '../services/bookService.js';
 
 /////// public routes (ALL GET endpoints) ////
 
@@ -101,35 +101,38 @@ router.get('/genre-search', queryValidation.search, validateRequest, async (req,
     }
 });
 
+router.get('/popular', async (req, res) => {
+    try {
+        const books = await Books.find().sort({ averageRating: -1 }).limit(20);
+        res.json(books);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch popular books', details: err.message });
+    }
+});
+
 router.get('/search-gateway', async (req, res) => {
     const { q} = req.query;
 
-    // 1. If no semantic query, use the local MongoDB Regex/Genre engine
-    if (!q || !q.trim()) {
-      
-        return res.redirect(307, `/books/genre-search?${new URLSearchParams(req.query).toString()}`);
-    }
-
-    // 2. If semantic query exists, redirect to the NLP search microservice which will handle both semantic and genre searching
-    return res.redirect(307, `/nlp/search?${new URLSearchParams(req.query).toString()}`);
    
-});
-
-// GET /books/popular - Get popular books sorted by average rating
-router.get('/popular', async (req, res) => {
-    try {
-        const limit = parseInt(req.query.limit) || 20; // Default to 20 books
-        
-        // Find books with at least some reviews and sort by average rating
-        const popularBooks = await Books.find({ reviewCount: { $gt: 0 } })
-            .sort({ averageRating: -1 }) // Sort by highest rating first
-            .limit(limit);
-                
-        res.json(popularBooks);
-    } catch (err) {
-        console.error('Failed to fetch popular books:', err);
-        res.status(500).json({ error: 'Failed to fetch popular books', details: err.message });
+    // 1. If no semantic query, use the local MongoDB Regex/Genre engine
+    if (!q?.trim()) {
+        try {
+            return res.json(await handleGenreSearch(req.query));
+        } catch (err) {
+            return res.status(500).json({ error: 'Search failed', details: err.message });
+        }
     }
+     // 2. If semantic query exists, redirect to the NLP search microservice which will handle both semantic and genre searching
+    try {
+        const response = await axios.get(process.env.PYTHON_API_NLPTEXTSEARCH_URL, {
+            params: req.query,
+            headers: { Authorization: req.headers.authorization }
+        });
+        return res.json(response.data);
+    } catch (err) {
+        return res.status(502).json({ error: 'NLP service unavailable', details: err.message });
+    }
+   
 });
 
 // retrieve a book by bookId
@@ -157,14 +160,11 @@ router.get('/:bookId/reviews', async (req, res) => {
 //////////// POST endpoints ///////////
 
 // POST /books/:id/reviews - Create or update a review for a book
-router.post('/:bookId/reviews', [paramValidation.bookId, ...reviewValidationRules.create], validateRequest, async (req, res) => {
+router.post('/:bookId/reviews', protect, [paramValidation.bookId, ...reviewValidationRules.create], validateRequest, async (req, res) => {
     try {
         const { bookId } = req.params;
-        const { username, rating, description } = req.body;
-
-        if (!username) {
-            return res.status(400).json({ error: 'username is required' });
-        }
+        const { rating, description } = req.body;
+        const username = req.user.username;
 
         const user = await Users.findOne({ username });
         if (!user) {
@@ -273,110 +273,4 @@ router.delete('/:bookId/wishlist', protect, async (req, res) => {
         res.status(500).json({ error: 'Failed to remove from wishlist', details: err.message });
     }
 });
-
-// SEARCH ENDPOINT WITH AND SEARCHES FOR ALL GENRES
-// router.get('/genre-search', async (req, res) => {
-//     try {
-//         const { q, genre, page, limit  } = req.query;
-//
-//         const parsedPage = Math.max(parseInt(page, 10), 1);
-//         const parsedLimit = Math.min(Math.max(parseInt(limit, 10), 1), 50); // Max 50 per page
-//         const skip = (parsedPage - 1) * parsedLimit;
-//
-//
-//         const andConditions = [];
-//
-//         if (q && q.trim() !== '') {
-//             andConditions.push({
-//                 $or: [
-//                     { title: { $regex: q, $options: 'i' } },
-//                     { author: { $regex: q, $options: 'i' } },
-//                     { description: { $regex: q, $options: 'i' } }
-//                 ]
-//             });
-//         }
-//
-//         if (genre) {
-//             const genreList = Array.isArray(genre)
-//                 ? genre
-//                 : genre.split(',').map((g) => g.trim());
-//
-//             if (genreList.length > 0) {
-//                 andConditions.push({ genre: { $all: genreList } });
-//             }
-//         }
-//
-//         // Final query
-//         const query = andConditions.length > 0 ? { $or: andConditions } : {};
-//
-//         const [books, totalCount] = await Promise.all([
-//             Books.find(query).skip(skip).limit(parsedLimit),
-//             Books.countDocuments(query)
-//         ]);
-//
-//         console.log("totalCount", totalCount);
-//         res.json({
-//             page: parsedPage,
-//             limit: parsedLimit,
-//             totalPages: Math.ceil(totalCount / parsedLimit),
-//             totalResults: totalCount,
-//             results: books
-//         });
-//     } catch (err) {
-//         res.status(500).json({ error: 'Search failed', details: err.message });
-//     }
-// });
-
-// potential flexible route for querying
-// router.get('/main.py', async (req, res) => {
-//     try {
-//         const query = {};
-//
-//         // Loop through each query parameter and apply logic
-//         for (const [key, value] of Object.entries(req.query)) {
-//             // For fields like title or author, use case-insensitive regex
-//             if (['title', 'author', 'description'].includes(key)) {
-//                 query[key] = new RegExp(value, 'i');
-//             }
-//             // For genre, match if any item in array matches (exact or partial)
-//             else if (key === 'genre') {
-//                 query.genre = { $in: [new RegExp(value, 'i')] }; // case-insensitive partial match
-//             }
-//             // For numeric fields like publishYear or ratingsCount
-//             else if (!isNaN(value)) {
-//                 query[key] = Number(value);
-//             }
-//             // Otherwise, use exact match
-//             else {
-//                 query[key] = value;
-//             }
-//         }
-//
-//         const books = await Books.find(query);
-//         res.json(books);
-//     } catch (err) {
-//         res.status(500).json({ error: 'Search failed', details: err.message });
-//     }
-// });
-
-// GET books by multiple genres /books/genres?genres=Romance,Fiction&sort=desc
-// router.get('/genres', async (req, res) => {
-//     try {
-//         const { genres, sort = 'desc' } = req.query;
-
-//         if (!genres) {
-//             return res.status(400).json({ error: 'Genres query parameter is required' });
-//         }
-
-//         const genreArray = genres.split(',').map(g => g.trim());
-
-//         const books = await Books.find({ genre: { $in: genreArray } })
-//             .sort({ averageRating: sort === 'asc' ? 1 : -1 });
-
-//         res.json(books);
-//     } catch (err) {
-//         res.status(500).json({ error: 'Failed to fetch books by genres', details: err.message });
-//     }
-// });
-
 export default router;
