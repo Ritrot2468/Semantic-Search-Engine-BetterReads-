@@ -6,6 +6,7 @@ import { useDispatch } from 'react-redux';
 import { addToBookListThunk, removeFromBookListThunk } from '../../redux/BooklistThunks.js';
 import { useSelector } from 'react-redux';
 import { Container, Grid, Box, Typography, Button, CircularProgress } from '@mui/material';
+import { NovellaNavy } from '../../styles/colors';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import StarRating from '../ratings/starRating';
@@ -35,16 +36,13 @@ const deleteButtonStyle = {
     fontSize: '0.9rem',
     cursor: 'pointer',
     transition: 'background-color 0.2s ease-in-out, color 0.2s ease-in-out',
-    '&:hover': {
-        backgroundColor: '#D32F2F',
-        color: '#FFFFFF',
-    },
+    '&:hover': { backgroundColor: '#D32F2F', color: '#FFFFFF' },
 };
 
 const buttonStyle = {
     backgroundColor: 'transparent',
-    border: '1px solid #151B54',
-    color: '#151B54',
+    border: `1px solid ${NovellaNavy}`,
+    color: NovellaNavy,
     borderRadius: '8px',
     padding: '0.5rem 1rem',
     fontFamily: 'Albert Sans, sans-serif',
@@ -52,10 +50,7 @@ const buttonStyle = {
     fontSize: '0.9rem',
     cursor: 'pointer',
     transition: 'background-color 0.2s ease-in-out, color 0.2s ease-in-out',
-    '&:hover': {
-        backgroundColor: '#151B54',
-        color: '#FFFFFF',
-    },
+    '&:hover': { backgroundColor: NovellaNavy, color: '#FFFFFF' },
 };
 
 export default function BookDetailsPage() {

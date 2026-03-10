@@ -15,6 +15,27 @@ const BookUtils = {
         return data.genres || [];
     },
 
+    // Browse search — calls /books/genre-search directly (has input validation middleware)
+    async browseBooks({ q = '', genres = [], min_year = null, max_year = null, page = 1, limit = 10 } = {}) {
+        const params = new URLSearchParams();
+        if (q.trim()) params.append('q', q.trim());
+        if (Array.isArray(genres) && genres.length > 0) params.append('genre', genres.join(','));
+        if (min_year) params.append('min_year', min_year);
+        if (max_year) params.append('max_year', max_year);
+        params.append('page', page);
+        params.append('limit', limit);
+
+        const res = await apiFetch(`${BASE_URL}/books/genre-search?${params.toString()}`);
+        if (!res.ok) throw new Error('Failed to fetch books');
+        const data = await res.json();
+        return {
+            results: data.results || [],
+            page: data.page || page,
+            totalPages: data.totalPages || 1,
+            totalResults: data.totalResults || 0,
+        };
+    },
+
     async fetchFromGateway (searchParams) {
         const response = await apiFetch(`${BASE_URL}/books/search-gateway?${searchParams.toString()}`);
         if (!response.ok) throw new Error('Network response was not ok');

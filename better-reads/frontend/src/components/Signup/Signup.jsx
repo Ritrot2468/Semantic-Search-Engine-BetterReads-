@@ -1,5 +1,5 @@
 import React from "react";
-import "../../styles/signup.css";
+import "../../styles/auth.css";
 import GenreDropDown from "./GenreDropDown";
 import { useNavigate, Link } from "react-router-dom";
 import { useState } from 'react';

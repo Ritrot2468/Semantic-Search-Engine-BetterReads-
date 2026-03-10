@@ -4,13 +4,15 @@ html, body {
     height: 100%;
 }
 
-.auth-page {
-	min-height: 100vh;
-	margin: 0;
-	color: white;
-	background-image: url('../images/background.png');
-	background-size: cover;
-	background-position: center;
+/* ── Shared page wrapper ─────────────────────────── */
+.auth-page,
+.signup-page {
+    min-height: 100vh;
+    margin: 0;
+    color: white;
+    background-image: url('../images/background.png');
+    background-size: cover;
+    background-position: center;
     background-attachment: fixed;
     display: flex;
     align-items: center;
@@ -19,118 +21,196 @@ html, body {
     box-sizing: border-box;
 }
 
+/* ── Shared typography ───────────────────────────── */
 h1 {
     font-family: 'Source Serif Pro', serif;
     font-weight: bold;
-  text-align: center;
-  font-size: clamp(2.5rem, 8vw, 4rem);
-  margin: 1rem 0;
-  word-wrap: break-word;
+    text-align: center;
+    font-size: clamp(2.5rem, 8vw, 4rem);
+    margin: 1rem 0;
+    word-wrap: break-word;
 }
 
-.better {
-	color: red;
-}
-
-.reads {
-	color: white;
-}
+.better { color: red; }
+.reads  { color: white; }
 
 h2 {
-	font-size: small;
-	text-align: center;
+    font-size: small;
+    text-align: center;
 }
 
 .tagline {
-	font-size: 1rem;
-	font-style: italic;
-	color: white;
-	margin-bottom: 2rem;
-	text-align: center;
+    font-size: 1rem;
+    font-style: italic;
+    color: white;
+    margin-bottom: 2rem;
+    text-align: center;
 }
 
-
-
-.auth-form {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
+/* ── Shared form layout ──────────────────────────── */
+.auth-form,
+.signup-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .auth-container {
-    /* This container is now just a simple wrapper. */
     width: 100%;
     display: flex;
     justify-content: center;
 }
 
-.auth-information {
-	background-color: #1e213d;
-	padding: 2rem;
-	border-radius: 12px;
-	box-shadow: 0 4px 12px white;
-	width: 90%;
-	max-width: 550px;
-	box-sizing: border-box;
-}
-
-.auth-information button {
-	padding: 0.7rem 1.3rem;
-	font-size: 0.9rem;
-	font-weight: bold;
-	border: none;
-	border-radius: 6px;
-	background-color: transparent;
-	color: white;
-	border: 2px solid white;
-}
-
-.form-row {
-	display: flex;
+.signup-container {
+    display: flex;
     flex-direction: column;
-	align-items: center;
-	justify-content: center;
-    width: 100%;
+    background-color: transparent;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
 }
 
-.auth-form label {
-	font-weight: bold;
+/* ── Cards ───────────────────────────────────────── */
+.auth-information {
+    background-color: #1e213d;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px white;
+    width: 90%;
+    max-width: 550px;
+    box-sizing: border-box;
+}
+
+.signup-information {
+    background-color: #1e213d;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px white;
+    width: 100%;
+    max-width: 720px;
+    box-sizing: border-box;
+}
+
+/* ── Buttons (scoped to prevent leaking globally) ── */
+.auth-information button,
+.signup-information button {
+    padding: 0.7rem 1.3rem;
+    font-size: 0.9rem;
+    font-weight: bold;
+    border-radius: 6px;
+    background-color: transparent;
+    color: white;
+    border: 2px solid white;
+    cursor: pointer;
+}
+
+.auth-information button:hover,
+.signup-information button:hover {
+    background-color: #45a049;
+}
+
+/* ── Form rows ───────────────────────────────────── */
+.form-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+.auth-form label,
+.signup-form label {
+    font-weight: bold;
     align-self: flex-start;
     margin-bottom: 0.5rem;
 }
 
-.auth-form input {
-	padding: 0.5rem;
-	border-radius: 0.3rem;
-	border: 1px solid #ccc;
-	margin-bottom: 1.25rem;
-	width: 100%;
-	box-sizing: border-box;
+.auth-form input,
+.signup-form input {
+    padding: 0.5rem;
+    border-radius: 0.3rem;
+    border: 1px solid #ccc;
+    margin-bottom: 1.25rem;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .button-row {
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: center;
-	gap: 1rem;
-	margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
 }
 
-.auth-information button:hover {
-	background-color: #45a049;
-}
-
+/* ── Footer link ─────────────────────────────────── */
 .form-footer {
-	text-align: center;
-	margin-top: 1rem;
-	font-size: 0.9rem;
-	color: white;
+    text-align: center;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: white;
 }
 
 .form-footer a {
-	color: white;
-	text-decoration: none;
-	font-weight: bold;
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
 }
 
+/* ── Genre dropdown (signup only) ────────────────── */
+.genre-dropdown-container .MuiFormControl-root {
+    width: 100%;
+    margin-bottom: 1rem;
+}
 
+.genre-dropdown-container .MuiOutlinedInput-root {
+    background-color: white;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.genre-dropdown-container .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline {
+    border-color: #ccc;
+}
+
+.genre-dropdown-container .MuiSelect-select {
+    color: black;
+}
+
+.genre-dropdown-container .MuiSelect-select span {
+    color: rgba(0, 0, 0, 0.87) !important;
+}
+
+.genre-dropdown-container .MuiSelect-icon {
+    color: #1F213B !important;
+}
+
+/* ── Responsive ──────────────────────────────────── */
+@media (max-width: 1024px) {
+    .signup-information { max-width: 70%; }
+}
+
+@media (max-width: 768px) {
+    .signup-information {
+        max-width: 95%;
+        padding: 1.5rem;
+        box-shadow: none;
+    }
+    .tagline { margin-bottom: 2rem; }
+}
+
+@media (max-width: 600px) {
+    .form-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .form-row label {
+        width: auto;
+        margin-bottom: 0.5rem;
+    }
+}
+
+@media (max-width: 320px) {
+    h1 { font-size: 1.8rem; }
+}

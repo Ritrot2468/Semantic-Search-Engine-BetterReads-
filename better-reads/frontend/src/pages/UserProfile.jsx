@@ -52,7 +52,7 @@ const UserProfile = () => {
               fontSize: { xs: '1.1rem', sm: '1.25rem' },
             }}
         >
-          {isGuest ? 'Reading List so far... (Sign up to save it!)' : 'Reading List'}
+          {isGuest ? 'Wishlist so far... (Sign up to save it!)' : 'Wishlist'}
         </Typography>
         <BookGalleryManager books={booklist} limit={10} />
       </Container>

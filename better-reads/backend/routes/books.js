@@ -56,7 +56,7 @@ router.get('/genre-tags', async (req, res) => {
 
 router.get('/genre-search', queryValidation.search, validateRequest, async (req, res) => {
     try {
-        const { q, genre, page, limit } = req.query;
+        const { q, genre, page, limit, min_year, max_year } = req.query;
 
         const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
         const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
@@ -82,6 +82,13 @@ router.get('/genre-search', queryValidation.search, validateRequest, async (req,
             if (genreList.length > 0) {
                 query.genre = { $in: genreList };
             }
+        }
+
+        // Year range filter
+        if (min_year || max_year) {
+            query.publishYear = {};
+            if (min_year) query.publishYear.$gte = min_year;
+            if (max_year) query.publishYear.$lte = max_year;
         }
 
         const [books, totalCount] = await Promise.all([
@@ -110,9 +117,7 @@ router.get('/popular', async (req, res) => {
     }
 });
 
-router.get('/search-gateway', async (req, res) => {
-    const { q} = req.query;
-
+router.get('/search-gateway', queryValidation.search, validateRequest, async (req, res) => {
    
     // 1. If no semantic query, use the local MongoDB Regex/Genre engine
     if (!q?.trim()) {

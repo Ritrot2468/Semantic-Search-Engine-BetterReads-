@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   TextField,
   Box,
@@ -11,251 +11,342 @@ import {
   MenuItem,
   OutlinedInput,
   Button,
+  Chip,
+  Tabs,
+  Tab,
+  CircularProgress,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import HeroBanner from '../components/common/HeroBanner';
-import { DetectiveDustyBlue } from '../styles/colors';
+import { DetectiveDustyBlue, NovellaNavy, NoirNavy } from '../styles/colors';
 import { BookPreview } from '../components/Book/BookPreview';
+import YearSelection from '../components/NLPSearch/YearSelection';
 import '../components/Book/BookPage.css';
 import BookUtils from "../utils/BookUtils.js";
 import { sanitizeContent, sanitizeObject } from '../utils/sanitize';
-// const genres = [
-//   "Fantasy", "Fiction", "Nonfiction", "Classics", "Science Fiction",
-//   "Mystery", "Thriller", "Romance", "Historical Fiction", "Horror",
-//   "Literary Fiction", "Young Adult", "Biography", "Contemporary"
-// ];
 
-const SearchPage = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+const GenreSelect = ({ genres, selectedGenres, onChange }) => (
+  <FormControl sx={{ width: { xs: '100%', md: 280 } }}>
+    <Select
+      multiple
+      displayEmpty
+      value={selectedGenres}
+      onChange={onChange}
+      input={<OutlinedInput />}
+      renderValue={(selected) =>
+        selected.length === 0
+          ? <em style={{ color: '#666' }}>Select genres...</em>
+          : selected.join(', ')
+      }
+      sx={{ borderRadius: '25px', backgroundColor: DetectiveDustyBlue, height: '56px' }}
+    >
+      <MenuItem disabled value=""><em style={{ color: '#666' }}>Select genres...</em></MenuItem>
+      {genres.map((g) => <MenuItem key={g} value={g}>{g}</MenuItem>)}
+    </Select>
+  </FormControl>
+);
+
+const BookGrid = ({ results, loading, hasSearched, emptyMessage }) => (
+  <>
+    {loading && (
+      <Box display="flex" justifyContent="center" mt={4}>
+        <CircularProgress sx={{ color: NoirNavy }} />
+      </Box>
+    )}
+    <Grid container spacing={3} sx={{ maxWidth: '1900px', margin: '0 auto', justifyContent: 'center', pb: '2rem' }}>
+      {results.length > 0
+        ? results.map((book, idx) => {
+            const key = book._id || book.id || idx;
+            return (
+              <Grid item xs={12} sm={6} md={4} key={key}>
+                {book.score && (
+                  <Chip
+                    icon={<AutoAwesomeIcon />}
+                    label={`${(book.score * 100).toFixed(0)}% match`}
+                    size="small"
+                    sx={{ mb: 0.5, backgroundColor: DetectiveDustyBlue, color: NovellaNavy, fontWeight: 'bold' }}
+                  />
+                )}
+                <BookPreview
+                  bookId={key}
+                  coverUrl={book.image || book.coverImage || book.coverUrl}
+                  title={book.title}
+                  rating={book.averageRating || 0}
+                  genres={book.genre || []}
+                />
+              </Grid>
+            );
+          })
+        : !loading && hasSearched && (
+            <Box sx={{ textAlign: 'center', width: '100%', py: 4 }}>
+              <Typography variant="h6">{emptyMessage}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Try adjusting your filters.
+              </Typography>
+            </Box>
+          )}
+    </Grid>
+  </>
+);
+
+// ── Browse tab (debounced, paginated) ─────────────────────────────────────────
+const BrowseSearch = ({ genres }) => {
+  const [query, setQuery] = useState('');
+  const [selectedGenres, setSelectedGenres] = useState([]);
+  const [startYear, setStartYear] = useState('');
+  const [endYear, setEndYear] = useState('');
+  const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [genres, setAllGenres] = useState([]);
-  const [selectedGenres, setSelectedGenres] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  
-
-  const handleSearch = useCallback(async (pageToFetch = 1, append = false) => {
-    // Sanitize search query and genres before sending to API
-    const trimmedQuery = sanitizeContent(searchQuery.trim());
-    const sanitizedGenres = selectedGenres.map(genre => sanitizeContent(genre));
-    
+  const runSearch = useCallback(async (pageToFetch = 1, append = false) => {
     setLoading(true);
     setError(null);
+    setHasSearched(true);
     try {
-      const data = await BookUtils.searchBooks({ 
-        q: trimmedQuery, 
-        genres: sanitizedGenres, 
-        page: pageToFetch 
+      const data = await BookUtils.browseBooks({
+        q: sanitizeContent(query.trim()),
+        genres: selectedGenres.map(g => sanitizeContent(g)),
+        min_year: startYear || null,
+        max_year: endYear || null,
+        page: pageToFetch,
       });
-      
-      // Sanitize the results before setting state
-      const sanitizedResults = data.results ? sanitizeObject(data.results) : [];
-      
-      if (append) {
-        setSearchResults(prev => [...prev, ...sanitizedResults]);
-      } else {
-        setSearchResults(sanitizedResults);
-      }
+      const sanitized = data.results ? sanitizeObject(data.results) : [];
+      setResults(prev => append ? [...prev, ...sanitized] : sanitized);
       setTotalPages(data.totalPages || 0);
       setPage(pageToFetch);
     } catch (err) {
-      console.error('FETCH ERROR:', err);
       setError(sanitizeContent(err.message));
-      if (!append) {
-        setSearchResults([]);
-      }
-      setTotalPages(0);
+      if (!append) setResults([]);
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedGenres]);
+  }, [query, selectedGenres]);
 
   useEffect(() => {
-    const fetchGenres = async () => {
-      try {
-        const genreList = await BookUtils.getAllGenreTags();
-        setAllGenres(genreList);
-      } catch (err) {
-        console.error("Failed to load genres", err);
-      }
-    };
+    const t = setTimeout(() => runSearch(1, false), 500);
+    return () => clearTimeout(t);
+  }, [query, selectedGenres, startYear, endYear, runSearch]);
 
-    fetchGenres();
-  }, []);
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      handleSearch(1, false); // Always fetch page 1 and replace results on new main.py
-    }, 500);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, selectedGenres, handleSearch]);
-
-  const handleShowMore = () => {
-    handleSearch(page + 1, true); // Fetch next page and append
-  };
-
-  const handleGenreChange = (event) => {
-    const { target: { value } } = event;
-    // Sanitize genre selections
-    const sanitizedValue = typeof value === 'string' 
-      ? sanitizeContent(value).split(',') 
-      : value.map(item => sanitizeContent(item));
-    
-    setSelectedGenres(sanitizedValue);
+  const handleGenreChange = (e) => {
+    const { value } = e.target;
+    setSelectedGenres(
+      typeof value === 'string'
+        ? sanitizeContent(value).split(',')
+        : value.map(v => sanitizeContent(v))
+    );
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      backgroundColor: '#fff',
-    }}>
-      <HeroBanner title="Reading is good for you. But we can make it better." />
-
-      <Box sx={{ backgroundColor: 'white', flexGrow: 1, paddingTop: '2rem' }}>
-        <Box sx={{
-          display: 'flex',
-          flexDirection: { xs: 'column', md: 'row' },
-          gap: 2,
-          alignItems: 'center',
-          maxWidth: 900,
-          mx: 'auto',
-          mb: 4,
-          px: 2,
-        }}>
+    <>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: 'center', maxWidth: 900, mx: 'auto', mb: 3, px: 2 }}>
         <TextField
           fullWidth
           variant="outlined"
-          placeholder="Search for books by title, author, or ISBN..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onBlur={(e) => setSearchQuery(sanitizeContent(e.target.value))}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch(1)}
+          placeholder="Search by title, author, or keyword..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onBlur={(e) => setQuery(sanitizeContent(e.target.value))}
+          onKeyPress={(e) => e.key === 'Enter' && runSearch(1)}
           sx={{
             flexGrow: 1,
             '& .MuiOutlinedInput-root': {
               borderRadius: '25px',
               backgroundColor: DetectiveDustyBlue,
-              '&:hover fieldset': {
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-              },
+              '&:hover fieldset': { borderColor: 'rgba(0,0,0,0.23)' },
             },
           }}
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
-                <IconButton onClick={() => handleSearch(1)}>
-                  <SearchIcon />
-                </IconButton>
+                <IconButton onClick={() => runSearch(1)}><SearchIcon /></IconButton>
               </InputAdornment>
             ),
           }}
         />
-        <FormControl sx={{ width: { xs: '100%', md: 300 } }}>
-          <Select
-            id="genre-select"
-            multiple
-            displayEmpty
-            value={selectedGenres}
-            onChange={handleGenreChange}
-            input={<OutlinedInput />}
-            renderValue={(selected) => {
-              if (selected.length === 0) {
-                return <em style={{ color: '#666' }}>Select genres...</em>;
-              }
-              return selected.join(', ');
-            }}
-            sx={{
-              borderRadius: '25px',
-              backgroundColor: DetectiveDustyBlue,
-              height: '56px',
-              width: '100%',
-            }}
-          >
-            <MenuItem disabled value="">
-              <em style={{ color: '#666' }}>Select genres...</em>
-            </MenuItem>
-            {genres.map((genre) => (
-              <MenuItem key={genre} value={genre}>
-                {genre}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <GenreSelect genres={genres} selectedGenres={selectedGenres} onChange={handleGenreChange} />
+        <Box sx={{ flex: 1, width: '100%' }}>
+            <YearSelection
+              fromYear={startYear}
+              toYear={endYear}
+              onChangeFrom={(e) => setStartYear(e.target.value)}
+              onChangeTo={(e) => setEndYear(e.target.value)}
+            />
+          </Box>
       </Box>
 
-      {loading && <Typography sx={{ textAlign: 'center', my: 2 }}>Loading...</Typography>}
-      {error && <Typography color="error" sx={{ textAlign: 'center', my: 2 }}>{`Error: ${error}`}</Typography>}
+      {error && <Typography color="error" sx={{ textAlign: 'center', mb: 2 }}>{error}</Typography>}
 
-      <Grid
-        container
-        spacing={3}
-        sx={{
-          maxWidth: '1900px',
-          margin: '0 auto',
-          justifyContent: 'center',
-          paddingBottom: '2rem'
-        }}>
-        {searchResults.length > 0 ? (
-          searchResults.map((book, idx) => {
-            const key = book._id || book.id || idx;
-            return (
-              <Grid item xs={12} sm={6} md={4} key={key}>
-                <BookPreview
-                  bookId={book._id || book.id || key}
-                  coverUrl={book.image || book.coverImage || book.coverUrl}
-                  title={book.title}
-                  rating={book.averageRating || 0}
-                  genres={book.genre || []}
-                  isFavorite={book.isFavorite || false}
-                  onToggleFavorite={() => { }}
-                />
-              </Grid>
-            );
-          })
-        ) : (
-          !loading && (
-            <Box sx={{ textAlign: 'center', width: '100%', py: 4 }}>
-              <Typography variant="h6">No books found matching your search.</Typography>
-            </Box>
-          )
-        )}
-      </Grid>
+      <BookGrid results={results} loading={loading} hasSearched={hasSearched} emptyMessage="No books found matching your search." />
 
       {page < totalPages && (
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
           <Button
             variant="outlined"
-            onClick={handleShowMore}
+            onClick={() => runSearch(page + 1, true)}
             disabled={loading}
             sx={{
-              fontFamily: 'Albert Sans, sans-serif',
               fontStyle: 'italic',
-              color: '#151B54',
-              borderColor: '#151B54',
-              borderWidth: '1px',
-              backgroundColor: 'transparent',
-              '&:hover': {
-                backgroundColor: '#151B54',
-                color: 'white',
-                borderColor: '#151B54',
-              },
+              color: NovellaNavy,
+              borderColor: NovellaNavy,
+              '&:hover': { backgroundColor: NovellaNavy, color: 'white' },
             }}
           >
             {loading ? 'Loading...' : 'Show More Books'}
           </Button>
         </Box>
       )}
+    </>
+  );
+};
+
+// ── AI Search tab (explicit trigger, year filters, match scores) ───────────────
+const AISearch = ({ genres }) => {
+  const [query, setQuery] = useState('');
+  const [selectedGenres, setSelectedGenres] = useState([]);
+  const [startYear, setStartYear] = useState('');
+  const [endYear, setEndYear] = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const handleSearch = async () => {
+    if (loading) return;
+    setLoading(true);
+    setError(null);
+    setHasSearched(true);
+    setResults([]);
+    try {
+      const params = new URLSearchParams();
+      const sanitizedQuery = sanitizeContent(query.trim());
+      if (sanitizedQuery) params.append('q', sanitizedQuery);
+      selectedGenres.forEach(g => params.append('genre', sanitizeContent(g)));
+      if (startYear) params.append('min_year', sanitizeContent(String(startYear)));
+      if (endYear) params.append('max_year', sanitizeContent(String(endYear)));
+
+      const data = await BookUtils.fetchFromGateway(params);
+      const raw = data.results || data;
+      setResults(Array.isArray(raw) ? sanitizeObject(raw) : []);
+    } catch (err) {
+      setError('Search failed. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenreChange = (e) => {
+    const { value } = e.target;
+    setSelectedGenres(
+      typeof value === 'string'
+        ? sanitizeContent(value).split(',')
+        : value.map(v => sanitizeContent(v))
+    );
+  };
+
+  return (
+    <>
+      <Box sx={{ maxWidth: 900, mx: 'auto', px: 2, mb: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: 'center', mb: 2 }}>
+          <GenreSelect genres={genres} selectedGenres={selectedGenres} onChange={handleGenreChange} />
+          <Box sx={{ flex: 1, width: '100%' }}>
+            <YearSelection
+              fromYear={startYear}
+              toYear={endYear}
+              onChangeFrom={(e) => setStartYear(e.target.value)}
+              onChangeTo={(e) => setEndYear(e.target.value)}
+            />
+          </Box>
+        </Box>
+
+        <TextField
+          fullWidth
+          multiline
+          rows={3}
+          placeholder="Describe what you're looking for in plain English — e.g. 'a slow-burn romance set in Victorian England with a strong female lead'"
+          variant="outlined"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onBlur={(e) => setQuery(sanitizeContent(e.target.value))}
+          sx={{
+            mb: 2,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: '12px',
+              backgroundColor: DetectiveDustyBlue,
+            },
+          }}
+        />
+
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+          <Button
+            variant="contained"
+            onClick={handleSearch}
+            disabled={loading}
+            startIcon={<AutoAwesomeIcon />}
+            sx={{
+              backgroundColor: NovellaNavy,
+              color: '#fff',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              px: 4,
+              py: 1.5,
+              borderRadius: '8px',
+              '&:hover': { backgroundColor: NoirNavy },
+            }}
+          >
+            Find AI Matches
+          </Button>
+        </Box>
+      </Box>
+
+      {error && <Typography color="error" sx={{ textAlign: 'center', mb: 2 }}>{error}</Typography>}
+
+      <BookGrid results={results} loading={loading} hasSearched={hasSearched} emptyMessage="No matches found. Try rephrasing your description." />
+    </>
+  );
+};
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+const SearchPage = () => {
+  const [tab, setTab] = useState(0);
+  const [genres, setAllGenres] = useState([]);
+
+  useEffect(() => {
+    BookUtils.getAllGenreTags()
+      .then(setAllGenres)
+      .catch(err => console.error("Failed to load genres", err));
+  }, []);
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#fff' }}>
+      <HeroBanner title="Reading is good for you. But we can make it better." />
+
+      <Box sx={{ backgroundColor: 'white', flexGrow: 1, pt: 2 }}>
+        <Box sx={{ maxWidth: 900, mx: 'auto', px: 2, mb: 3 }}>
+          <Tabs
+            value={tab}
+            onChange={(_, v) => setTab(v)}
+            sx={{
+              '& .MuiTab-root': { fontFamily: 'Albert Sans, sans-serif', fontStyle: 'italic', textTransform: 'none', fontSize: '1rem' },
+              '& .Mui-selected': { color: `${NovellaNavy} !important`, fontWeight: 'bold' },
+              '& .MuiTabs-indicator': { backgroundColor: NovellaNavy },
+            }}
+          >
+            <Tab icon={<SearchIcon />} iconPosition="start" label="Browse Books" />
+            <Tab icon={<AutoAwesomeIcon />} iconPosition="start" label="AI Search" />
+          </Tabs>
+        </Box>
+
+        {tab === 0 && <BrowseSearch genres={genres} />}
+        {tab === 1 && <AISearch genres={genres} />}
       </Box>
     </div>
   );
 };
-
-
 
 export default SearchPage;

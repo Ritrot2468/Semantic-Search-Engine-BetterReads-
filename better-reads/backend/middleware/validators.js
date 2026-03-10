@@ -175,19 +175,29 @@ export const queryValidation = {
       .optional()
       .trim()
       .customSanitizer(sanitizeInput),
-      
+
     query('genre')
       .optional()
       .customSanitizer(sanitizeInput),
-      
+
     query('page')
       .optional()
       .isInt({ min: 1 }).withMessage('Page must be a positive integer')
       .toInt(),
-      
+
     query('limit')
       .optional()
       .isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50')
+      .toInt(),
+
+    query('min_year')
+      .optional()
+      .isInt({ min: 1000, max: 9999 }).withMessage('min_year must be a valid year')
+      .toInt(),
+
+    query('max_year')
+      .optional()
+      .isInt({ min: 1000, max: 9999 }).withMessage('max_year must be a valid year')
       .toInt(),
   ],
   
