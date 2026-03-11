@@ -3,9 +3,10 @@ import Books from '../model/books.js';
 import Reviews from '../model/reviews.js';
 import Users from "../model/users.js";
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
 import { protect } from '../middleware/authentification.js';
 import { validateRequest, queryValidation, paramValidation, reviewValidationRules } from '../middleware/validators.js';
-import { deleteFromRedis } from '../services/redisClient.js';
+import { getFromRedis, storeInRedis, deleteFromRedis } from '../services/redisClient.js';
 const router = express.Router();
 import { handleGenreSearch } from '../services/bookService.js';
 
@@ -39,15 +40,18 @@ router.get('/search', queryValidation.search, validateRequest, async (req, res) 
 // GET /books/genres - Get all genre tags in db
 router.get('/genre-tags', async (req, res) => {
     try {
+        const cached = await getFromRedis('general:genre-tags');
+        if (cached) return res.json(cached);
+
         const genres = await Books.aggregate([
             { $unwind: '$genre' },
             { $group: { _id: '$genre' } },
             { $sort: { _id: 1 } }
         ]);
 
-        const genreList = genres.map(g => g._id);
-
-        res.json({ genres: genreList });
+        const payload = { genres: genres.map(g => g._id) };
+        await storeInRedis('general:genre-tags', payload, 86400); // 24h
+        res.json(payload);
     } catch (err) {
         console.error('Failed to fetch genres:', err.message);
         res.status(500).json({ error: 'Failed to fetch genres', details: err.message });
@@ -110,7 +114,11 @@ router.get('/genre-search', queryValidation.search, validateRequest, async (req,
 
 router.get('/popular', async (req, res) => {
     try {
+        const cached = await getFromRedis('general:popular');
+        if (cached) return res.json(cached);
+
         const books = await Books.find().sort({ averageRating: -1 }).limit(20);
+        await storeInRedis('general:popular', books, 21600); // 6h
         res.json(books);
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch popular books', details: err.message });
@@ -146,6 +154,19 @@ router.get('/:bookId', paramValidation.bookId, validateRequest, async (req, res)
         const book = await Books.findById(req.params.bookId);
         if (!book) return res.status(404).json({ error: 'Book not found' });
         res.json(book);
+
+        // Soft-auth: track recently viewed books without blocking response
+        const token = req.headers.authorization?.split(' ')[1];
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                const recentKey = `ml:rec:${decoded.username}:recent`;
+                const recent = (await getFromRedis(recentKey)) || [];
+                const bookIdStr = book._id.toString();
+                const updated = [bookIdStr, ...recent.filter(id => id !== bookIdStr)].slice(0, 20);
+                await storeInRedis(recentKey, updated, 604800); // 7 days
+            } catch (_) { /* invalid/expired token, skip */ }
+        }
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch book', details: err.message });
     }
@@ -194,6 +215,8 @@ router.post('/:bookId/reviews', protect, [paramValidation.bookId, ...reviewValid
             // Update the recommender matrix and remove the user's old recommendations from Redis to ensure they get updated recommendations based on the new review 
             try {
                 await deleteFromRedis(`recs:user:${username}`);
+                await deleteFromRedis(`ml:rec:${username}:recent`);
+                await deleteFromRedis(`ml:rec:${username}:favorites`);
                 await axios.post('http://recommender:5001/update-matrix');
                 console.log('Recommender matrix updated after review update');
             } catch (updateError) {
@@ -247,8 +270,9 @@ router.post('/:bookId/reviews', protect, [paramValidation.bookId, ...reviewValid
 // add book to wishlist
 router.post('/:bookId/wishlist', protect, async (req, res) => {
     try {
-        const userId  = req.user.id;
-        
+        const userId = req.user.id;
+        const username = req.user.username;
+
         const updatedUser = await Users.findByIdAndUpdate(
             userId,
             { $addToSet: { wishList: req.params.bookId } },
@@ -257,6 +281,12 @@ router.post('/:bookId/wishlist', protect, async (req, res) => {
 
         if (!updatedUser) return res.status(404).json({ error: 'User not found' });
         res.json(updatedUser.wishList);
+
+        // Update favorites cache after response
+        try {
+            const favIds = updatedUser.wishList.map(id => id.toString());
+            await storeInRedis(`ml:rec:${username}:favorites`, favIds, 604800); // 7 days
+        } catch (_) { /* non-blocking */ }
     } catch (err) {
         res.status(500).json({ error: 'Failed to add to wishlist', details: err.message });
     }
@@ -264,8 +294,9 @@ router.post('/:bookId/wishlist', protect, async (req, res) => {
 
 router.delete('/:bookId/wishlist', protect, async (req, res) => {
     try {
-        const userId  = req.user.id;
-        
+        const userId = req.user.id;
+        const username = req.user.username;
+
         const updatedUser = await Users.findByIdAndUpdate(
             userId,
             { $pull: { wishList: req.params.bookId } },
@@ -274,6 +305,12 @@ router.delete('/:bookId/wishlist', protect, async (req, res) => {
 
         if (!updatedUser) return res.status(404).json({ error: 'User not found' });
         res.json(updatedUser.wishList);
+
+        // Update favorites cache after response
+        try {
+            const favIds = updatedUser.wishList.map(id => id.toString());
+            await storeInRedis(`ml:rec:${username}:favorites`, favIds, 604800); // 7 days
+        } catch (_) { /* non-blocking */ }
     } catch (err) {
         res.status(500).json({ error: 'Failed to remove from wishlist', details: err.message });
     }

@@ -5,8 +5,10 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { GenreTags } from '../Book/BookUtils';
 import { sanitizeContent } from '../../utils/sanitize';
+import { logoutUser } from '../../redux/UserThunks';
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(2),
@@ -18,9 +20,11 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   },
 }));
 
-const UserCard = ({ user, onChangePassword, onSignOut }) => {
+const UserCard = ({ user, onChangePassword}) => {
   const isGuest = user?.isGuest;
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const logoutError = useSelector(state => state.user.status === 'failed' ? state.user.error : null);
 
   const handleSignUp = () => {
     navigate('/signup');
@@ -29,7 +33,17 @@ const UserCard = ({ user, onChangePassword, onSignOut }) => {
   const handleLogin = () => {
     navigate('/login');
   };
-  
+
+  const onSignOut = async () => {
+    try {
+      await dispatch(logoutUser()).unwrap();
+    } catch (_) {
+      // Server logout failed — local state is already cleared by the thunk.
+      // Slice sets status='failed' and error=payload; logoutError will render it.
+    }
+    navigate('/login');
+  };
+
   const formatDate = (date) => {
     if (!date) return '';
     return new Date(date).toLocaleDateString('en-US', {
@@ -156,6 +170,12 @@ const UserCard = ({ user, onChangePassword, onSignOut }) => {
           )}
         </Stack>
       </Box>
+
+      {logoutError && (
+        <Typography variant="body2" color="error" sx={{ mt: 1, textAlign: 'right' }}>
+          Sign out error: {logoutError}
+        </Typography>
+      )}
 
       {user?.favoriteGenres && user.favoriteGenres.length > 0 && (
         <>

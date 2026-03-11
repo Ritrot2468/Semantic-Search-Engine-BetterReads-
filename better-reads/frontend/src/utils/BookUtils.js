@@ -59,15 +59,6 @@ const BookUtils = {
         params.append('page', page);
         params.append('limit', limit);
 
-        // const queryString = params.toString();
-        // console.log("query: ", queryString);
-        // const res = await apiFetch(`${BASE_URL}/books/genre-search?${queryString}`);
-
-        // if (!res.ok) {
-        //     const error = await res.json().catch(() => ({}));
-        //     throw new Error(error?.error || 'Failed to main.py books');
-        // }
-
         // const data = await res.json();
         const data = await this.fetchFromGateway(params);
         return {

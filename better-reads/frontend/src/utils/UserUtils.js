@@ -9,7 +9,7 @@ const UserUtils = {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                    // You can also include Authorization headers here if needed
+                    
                 },
                 body: JSON.stringify({
                     username,
@@ -29,7 +29,21 @@ const UserUtils = {
             console.error('Change password error:', err.message);
             throw err;
         }
+    },
+    async signOut() {
+        try {
+            const res = await apiFetch(`${BASE_URL}/users/logout`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+        } catch (err) {
+            console.error('Sign out error:', err.message);
+            throw err;
+        }
     }
+
 }
 
 export default UserUtils;

@@ -11,7 +11,7 @@ import { userValidationRules, validateRequest, sanitizeInput, paramValidation } 
 import { param } from 'express-validator';
 import crypto from 'crypto';
 import { protect } from '../middleware/authentification.js';
-import { storeInRedis, getFromRedis } from '../services/redisClient.js';
+import { storeInRedis, getFromRedis, deleteFromRedis } from '../services/redisClient.js';
 import { getRecommendations } from '../services/recommendations.js';
 
 
@@ -158,17 +158,35 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
     }
 });
 
-// POST /logout //TODO: update w/ redux????
+// POST /logout
 router.post('/logout', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
+
+    // Blacklist the token
     if (token) await storeInRedis(`blacklist:token:${token}`, { status: 'revoked' }, 3600);
+
+    // Blacklist the fingerprint
     const fp = req.cookies['__Secure-Fp'] || req.cookies['fp'];
     if (fp) {
         const fpHash = crypto.createHash('sha256').update(fp).digest('hex');
         await storeInRedis(`blacklist:fp:${fpHash}`, { status: 'revoked' }, 3600);
     }
 
-    // Clear whatever cookie exists
+    // Clear user-specific cache keys
+    if (token) {
+        try {
+            const decoded = jwt.decode(token); // decode only — already blacklisted above
+            if (decoded?.username) {
+                const { username } = decoded;
+                await Promise.all([
+                    deleteFromRedis(`ml:rec:${username}:recent`),
+                    deleteFromRedis(`ml:rec:${username}:favorites`),
+                    deleteFromRedis(`recs:user:${username}`),
+                ]);
+            }
+        } catch (_) { /* malformed token, skip cache clear */ }
+    }
+
     res.clearCookie('__Secure-Fp');
     res.clearCookie('fp');
     res.status(200).json({ message: 'Logged out' });
@@ -363,6 +381,12 @@ router.patch('/update-wishlist/:userId', [paramValidation.userId, ...userValidat
         const userSafe = user.toObject();
         delete userSafe.password;
         res.json(userSafe);
+
+        // Update favorites cache after response
+        try {
+            const favIds = user.wishList.map(id => id.toString());
+            await storeInRedis(`ml:rec:${req.user.username}:favorites`, favIds, 604800); // 7 days
+        } catch (_) { /* non-blocking */ }
     } catch (err) {
         res.status(400).json({ error: 'Failed to update wishlist', details: err.message });
     }

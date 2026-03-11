@@ -81,6 +81,22 @@ const userSlice = createSlice({
                 state.user = guestUser;
                 state.status = 'idle';
                 state.isGuest = true;
+            })
+            .addCase(logoutUser.pending, (state) => {
+                state.status = 'loading';
+            })
+            .addCase(logoutUser.fulfilled, (state) => {
+                state.user = guestUser;
+                state.status = 'idle';
+                state.error = null;
+                state.isGuest = true;
+            })
+            .addCase(logoutUser.rejected, (state, action) => {
+                // Local state still cleared (localStorage/booklist handled in thunk)
+                state.user = guestUser;
+                state.status = 'failed';
+                state.error = action.payload;
+                state.isGuest = true;
             });
     },
 });

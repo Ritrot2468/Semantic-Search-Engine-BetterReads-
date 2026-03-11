@@ -3,6 +3,7 @@ import { createAsyncThunk } from '@reduxjs/toolkit';
 import {clearBooklist, setBooklist} from "./Booklist.js";
 import {clearUser} from "./UserSlice.js";
 import { apiFetch } from '../api/apiFetch.js';
+import UserUtils from '../utils/UserUtils.js';
 
 
 export const loginUser = createAsyncThunk(
@@ -91,17 +92,18 @@ export const fetchUserProfile = createAsyncThunk(
 
 
 export const logoutUser = createAsyncThunk('user/logoutUser', async (_, thunkAPI) => {
-    const { dispatch} = thunkAPI;
-    dispatch(clearUser());
-    dispatch(clearBooklist());
-    
-    // Clear all authentication and user data from localStorage
+    // Always clear local state regardless of server response
+    try {
+        await UserUtils.signOut();
+        return true;
+    } catch (err) {
+        return thunkAPI.rejectWithValue(err.message || 'Logout failed');
+    }
     localStorage.removeItem('appState');
     localStorage.removeItem('user');
     localStorage.removeItem('token');
-    
-    console.log('User logged out, localStorage cleared');
-    return true;
+    thunkAPI.dispatch(clearBooklist());
+
 });
 
 export const verifySession = createAsyncThunk(

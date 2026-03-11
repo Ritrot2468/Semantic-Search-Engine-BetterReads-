@@ -40,3 +40,4 @@ export async function handleGenreSearch(query) {
             totalResults: totalCount, 
             results: books };
 }
+
