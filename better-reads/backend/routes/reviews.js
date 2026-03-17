@@ -9,6 +9,20 @@ import { validateRequest, reviewValidationRules, paramValidation, queryValidatio
 const router = express.Router();
 import { protect } from '../middleware/authentification.js';
 
+async function recalcBookRating(bookId) {
+    const result = await Reviews.aggregate([
+        { $match: { bookId: new mongoose.Types.ObjectId(bookId) } },
+        { $group: { _id: '$bookId', avg: { $avg: '$rating' }, count: { $sum: 1 } } }
+    ]);
+    const avg = result[0]?.avg ?? 0;
+    const count = result[0]?.count ?? 0;
+    await Books.findByIdAndUpdate(bookId, {
+        averageRating: Math.round(avg * 10) / 10,
+        ratingsCount: count,
+        reviewCount: count
+    });
+}
+
 // PUT /reviews/:reviewId - Edit a user's review
 router.put('/:reviewId', [paramValidation.reviewId, ...reviewValidationRules.update], validateRequest, protect, async (req, res) => {
     try {
@@ -23,13 +37,12 @@ router.put('/:reviewId', [paramValidation.reviewId, ...reviewValidationRules.upd
 
         if (!updated) return res.status(404).json({ error: 'Review not found' });
 
-        // Update the recommender matrix
+        // Recalculate book rating and update recommender matrix
         try {
-            await axios.post('http://recommender:5001/update-matrix');
-            console.log('Recommender matrix updated after review edit');
+            await recalcBookRating(updated.bookId);
+            await axios.post(`${process.env.RECOMMENDER_URL}/update-matrix`);
         } catch (updateError) {
-            console.error('Failed to update recommender matrix:', updateError.message);
-            // Don't fail the request if matrix update fails
+            console.error('Failed to recalc rating or update recommender:', updateError.message);
         }
 
         res.json(updated);
@@ -48,24 +61,16 @@ router.delete('/:reviewId', paramValidation.reviewId, validateRequest, protect, 
         const review = await Reviews.findByIdAndDelete(reviewId);
         if (!review) return res.status(404).json({ error: 'Review not found' });
 
-        // Update the recommender matrix
+        // Recalculate book rating and update recommender matrix
         try {
-            await axios.post('http://recommender:5001/update-matrix');
-            console.log('Recommender matrix updated after review deletion');
+            await recalcBookRating(review.bookId);
+            await axios.post(`${process.env.RECOMMENDER_URL}/update-matrix`);
         } catch (updateError) {
-            console.error('Failed to update recommender matrix:', updateError.message);
-            // Don't fail the request if matrix update fails
+            console.error('Failed to recalc rating or update recommender:', updateError.message);
         }
 
-        // Proceed to sync: decrement book review count and remove review from user
-        const book = await Books.findById(review.bookId);
-        const user = await Users.findOne({ username: review.userId }); // or use user _id if stored
-
-        if (book && typeof book.reviewCount === 'number' && book.reviewCount > 0) {
-            book.reviewCount -= 1;
-            await book.save();
-        }
-
+        // Remove review reference from user
+        const user = await Users.findOne({ _id: review.userId });
         if (user && Array.isArray(user.reviews)) {
             user.reviews = user.reviews.filter(id => !id.equals(review._id));
             await user.save();

@@ -1,6 +1,6 @@
 
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import {clearBooklist, setBooklist} from "./Booklist.js";
+import { clearBooklist, setBooklist, setAllReadingStatuses, setCustomLists, clearReadingData } from "./Booklist.js";
 import {clearUser} from "./UserSlice.js";
 import { apiFetch } from '../api/apiFetch.js';
 import UserUtils from '../utils/UserUtils.js';
@@ -30,6 +30,8 @@ export const loginUser = createAsyncThunk(
             localStorage.setItem('token', data.token);
             localStorage.setItem('user', JSON.stringify(data.user));
             thunkAPI.dispatch(setBooklist(data.user.wishList || []));
+            thunkAPI.dispatch(setAllReadingStatuses(data.user.readingStatus || []));
+            thunkAPI.dispatch(setCustomLists(data.user.customLists || []));
             return data.user;
         } catch (err) {
             return thunkAPI.rejectWithValue( err);
@@ -62,6 +64,8 @@ export const signupUser = createAsyncThunk(
             const user = signupData.user;
             localStorage.setItem('user', JSON.stringify(user));
             thunkAPI.dispatch(setBooklist(user.wishList || []));
+            thunkAPI.dispatch(setAllReadingStatuses(user.readingStatus || []));
+            thunkAPI.dispatch(setCustomLists(user.customLists || []));
             return user;
         } catch (err) {
             return thunkAPI.rejectWithValue(err);
@@ -103,6 +107,7 @@ export const logoutUser = createAsyncThunk('user/logoutUser', async (_, thunkAPI
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     thunkAPI.dispatch(clearBooklist());
+    thunkAPI.dispatch(clearReadingData());
 
 });
 
@@ -122,7 +127,11 @@ export const verifySession = createAsyncThunk(
 
         // Session is valid - rehydrate user from localStorage
         const user = JSON.parse(localStorage.getItem('user'));
-        if (user) thunkAPI.dispatch(setBooklist(user.wishList || []));
+        if (user) {
+            thunkAPI.dispatch(setBooklist(user.wishList || []));
+            thunkAPI.dispatch(setAllReadingStatuses(user.readingStatus || []));
+            thunkAPI.dispatch(setCustomLists(user.customLists || []));
+        }
         return user;
     }
 );
