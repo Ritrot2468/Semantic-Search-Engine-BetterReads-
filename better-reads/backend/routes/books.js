@@ -30,7 +30,6 @@ router.get('/search', queryValidation.search, validateRequest, async (req, res) 
         }
 
         const books = await Books.find(query);
-        console.log(books);
         res.json(books);
     } catch (err) {
         res.status(500).json({ error: 'Search failed', details: err.message });
@@ -126,7 +125,8 @@ router.get('/popular', async (req, res) => {
 });
 
 router.get('/search-gateway', queryValidation.search, validateRequest, async (req, res) => {
-   
+    const { q } = req.query;
+
     // 1. If no semantic query, use the local MongoDB Regex/Genre engine
     if (!q?.trim()) {
         try {
@@ -217,7 +217,7 @@ router.post('/:bookId/reviews', protect, [paramValidation.bookId, ...reviewValid
                 await deleteFromRedis(`recs:user:${username}`);
                 await deleteFromRedis(`ml:rec:${username}:recent`);
                 await deleteFromRedis(`ml:rec:${username}:favorites`);
-                await axios.post('http://recommender:5001/update-matrix');
+                await axios.post(`${process.env.RECOMMENDER_URL}/update-matrix`);
                 console.log('Recommender matrix updated after review update');
             } catch (updateError) {
                 console.error('Failed to update recommender matrix:', updateError.message);
@@ -252,7 +252,7 @@ router.post('/:bookId/reviews', protect, [paramValidation.bookId, ...reviewValid
         // Update the recommender matrix
         try {
             await deleteFromRedis(`recs:user:${username}`);
-            await axios.post('http://recommender:5001/update-matrix');
+            await axios.post(`${process.env.RECOMMENDER_URL}/update-matrix`);
             console.log('Recommender matrix updated after new review');
         } catch (updateError) {
             console.error('Failed to update recommender matrix:', updateError.message);

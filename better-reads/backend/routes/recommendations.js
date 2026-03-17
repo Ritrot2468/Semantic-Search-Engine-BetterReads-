@@ -1,14 +1,15 @@
 import express from 'express';
 import { getRecommendations } from '../services/recommendations.js';
+import { protect } from '../middleware/authentification.js';
 
 const router = express.Router();
 
 /**
  * @route   GET /api/recommend/:username
  * @desc    Get book recommendations for a specific user
- * @access  Public
+ * @access  Private
  */
-router.get('/:username', async (req, res) => {
+router.get('/:username', protect, async (req, res) => {
   try {
     if (!req.params.username) {
       return res.status(400).json({ error: 'Username is required' });
