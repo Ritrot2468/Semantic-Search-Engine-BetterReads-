@@ -27,8 +27,6 @@ services:
       - betterreads-network
 
   # Backend service
-
-  # Backend service
   backend:
     build:
       context: ./backend
@@ -41,15 +39,16 @@ services:
       - redis
       - recommender
       - nlpsearch
+    env_file:
+      - ./backend/.env
     environment:
-      - MONGO_URI=mongodb+srv://rex015:iDPU4rvt5HjtDrW1@sandbox.bcebozm.mongodb.net/bookdb?retryWrites=true&w=majority&appName=Sandbox
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
-      - JWT_SECRET=your_jwt_secret_key
       - PORT=3000
       - DOCKER_ENV=true
       - PYTHON_API_NLPTEXTSEARCH_URL=http://nlpsearch:5002/search
+      - RECOMMENDER_URL=http://recommender:5001
     networks:
       - betterreads-network
     volumes:
@@ -77,8 +76,9 @@ services:
     depends_on:
       - mongodb
       - redis
+    env_file:
+      - ./recommender/.env
     environment:
-      - MONGO_URI=mongodb+srv://rex015:iDPU4rvt5HjtDrW1@sandbox.bcebozm.mongodb.net/bookdb?retryWrites=true&w=majority&appName=Sandbox
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0

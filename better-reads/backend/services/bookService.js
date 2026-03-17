@@ -6,6 +6,7 @@ export async function handleGenreSearch(query) {
     const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
     const skip = (parsedPage - 1) * parsedLimit;
 
+    const dbQuery = {};
 
     // Text search
     if (q && q.trim()) {
@@ -15,8 +16,6 @@ export async function handleGenreSearch(query) {
             { description: { $regex: q, $options: 'i' } }
         ];
     }
-
-    const dbQuery = {};
     if (genre) {
         const genreList = Array.isArray(genre) ? genre : genre.split(',').map(g => g.trim());
         if (genreList.length > 0) dbQuery.genre = { $in: genreList };

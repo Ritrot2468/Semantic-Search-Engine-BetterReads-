@@ -91,7 +91,7 @@ router.post('/signup', userValidationRules.signup, validateRequest, async (req, 
         });
         // Update the recommender matrix to include the new user
         try {
-            await axios.post('http://recommender:5001/update-matrix');
+            await axios.post(`${process.env.RECOMMENDER_URL}/update-matrix`);
             console.log('Recommender matrix updated after new user signup');
         } catch (updateError) {
             console.error('Failed to update recommender matrix:', updateError.message);
@@ -148,11 +148,9 @@ router.post('/login', userValidationRules.login, validateRequest, async (req, re
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
         res.json({token, user: userObject});
-        console.log(`Warming recommendation cache for: ${username}`);
         getRecommendations(username).catch(err => {
             console.error("Non-blocking Cache Warming Error:", err.message);
         });
-        //res.json({ message: 'Login successful', userId: user._id });
     } catch (err) {
         res.status(500).json({ error: 'Login failed', details: err.message });
     }
@@ -354,7 +352,6 @@ router.put('/:userId', paramValidation.userId, validateRequest, protect, async (
 // PATCH /users/update-wishlist/:id
 router.patch('/update-wishlist/:userId', [paramValidation.userId, ...userValidationRules.addToBooklist], validateRequest, protect, async (req, res) => {
     try {
-        console.log("Made it to the route!");
         if (req.user.id !== req.params.userId) {
             return res.status(403).json({ error: 'Forbidden: You can only update your own wishlist' });
         }
