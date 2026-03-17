@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Books from '../model/books.js';
 import Reviews from '../model/reviews.js';
 import Users from "../model/users.js";
@@ -9,6 +10,21 @@ import { validateRequest, queryValidation, paramValidation, reviewValidationRule
 import { getFromRedis, storeInRedis, deleteFromRedis } from '../services/redisClient.js';
 const router = express.Router();
 import { handleGenreSearch } from '../services/bookService.js';
+
+// Recalculate a book's averageRating, ratingsCount, and reviewCount from live review data.
+async function recalcBookRating(bookId) {
+    const result = await Reviews.aggregate([
+        { $match: { bookId: new mongoose.Types.ObjectId(bookId) } },
+        { $group: { _id: '$bookId', avg: { $avg: '$rating' }, count: { $sum: 1 } } }
+    ]);
+    const avg = result[0]?.avg ?? 0;
+    const count = result[0]?.count ?? 0;
+    await Books.findByIdAndUpdate(bookId, {
+        averageRating: Math.round(avg * 10) / 10,
+        ratingsCount: count,
+        reviewCount: count
+    });
+}
 
 /////// public routes (ALL GET endpoints) ////
 
@@ -212,18 +228,17 @@ router.post('/:bookId/reviews', protect, [paramValidation.bookId, ...reviewValid
                 { new: true, upsert: true, runValidators: true }
             ).populate('userId', 'username avatarUrl');
             
-            // Update the recommender matrix and remove the user's old recommendations from Redis to ensure they get updated recommendations based on the new review 
+            // Recalculate book rating and update recommender matrix
             try {
+                await recalcBookRating(bookId);
                 await deleteFromRedis(`recs:user:${username}`);
                 await deleteFromRedis(`ml:rec:${username}:recent`);
                 await deleteFromRedis(`ml:rec:${username}:favorites`);
                 await axios.post(`${process.env.RECOMMENDER_URL}/update-matrix`);
-                console.log('Recommender matrix updated after review update');
             } catch (updateError) {
-                console.error('Failed to update recommender matrix:', updateError.message);
-                // Don't fail the request if matrix update fails
+                console.error('Failed to recalc rating or update recommender:', updateError.message);
             }
-            
+
             return res.status(200).json(updated);
         }
 
@@ -241,22 +256,17 @@ router.post('/:bookId/reviews', protect, [paramValidation.bookId, ...reviewValid
         if (!book) throw new Error('Book not found');
 
 
-        //  Increment book review count
-        book.reviewCount = (book.reviewCount || 0) + 1;
-        await book.save();
-
         //  Add review to user if not already included
         user.reviews.push(savedReview._id);
         await user.save();
-        
-        // Update the recommender matrix
+
+        // Recalculate book rating and update recommender matrix
         try {
+            await recalcBookRating(bookId);
             await deleteFromRedis(`recs:user:${username}`);
             await axios.post(`${process.env.RECOMMENDER_URL}/update-matrix`);
-            console.log('Recommender matrix updated after new review');
         } catch (updateError) {
-            console.error('Failed to update recommender matrix:', updateError.message);
-            // Don't fail the request if matrix update fails
+            console.error('Failed to recalc rating or update recommender:', updateError.message);
         }
         const populatedReview = await Reviews.findById(savedReview._id).populate('userId', 'username avatarUrl');
         
