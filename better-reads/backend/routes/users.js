@@ -492,7 +492,7 @@ router.patch('/:userId/lists/:listId', paramValidation.userId, validateRequest, 
         }
 
         await user.save();
-        res.json(list);
+        res.json(user.customLists);
     } catch (err) {
         res.status(400).json({ error: 'Failed to update list', details: err.message });
     }

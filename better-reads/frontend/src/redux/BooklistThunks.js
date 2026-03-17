@@ -88,10 +88,8 @@ export const updateListBooksThunk = createAsyncThunk(
     'booklist/updateListBooks',
     async ({ userId, listId, bookId, operation }, thunkAPI) => {
         try {
-            await BookUtils.updateListBooks(userId, listId, bookId, operation);
-            // Refresh the full list state after update
-            const statuses = await BookUtils.getReadingStatuses(userId);
-            thunkAPI.dispatch(setAllReadingStatuses(statuses));
+            const updatedLists = await BookUtils.updateListBooks(userId, listId, bookId, operation);
+            thunkAPI.dispatch(setCustomLists(updatedLists));
         } catch (err) {
             console.error('Failed to update list books:', err);
             return thunkAPI.rejectWithValue(err.message);

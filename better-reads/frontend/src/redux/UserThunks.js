@@ -96,19 +96,16 @@ export const fetchUserProfile = createAsyncThunk(
 
 
 export const logoutUser = createAsyncThunk('user/logoutUser', async (_, thunkAPI) => {
-    // Always clear local state regardless of server response
     try {
         await UserUtils.signOut();
-        return true;
     } catch (err) {
-        return thunkAPI.rejectWithValue(err.message || 'Logout failed');
+        // ignore server error — always clear local state
     }
     localStorage.removeItem('appState');
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     thunkAPI.dispatch(clearBooklist());
     thunkAPI.dispatch(clearReadingData());
-
 });
 
 export const verifySession = createAsyncThunk(
@@ -117,21 +114,31 @@ export const verifySession = createAsyncThunk(
         const token = localStorage.getItem('token');
         if (!token) return thunkAPI.rejectWithValue('No token');
 
-        const res = await apiFetch(`${import.meta.env.VITE_API_BASE_URL}/auth/verify`);
-
-        if (!res.ok) {
+        const verifyRes = await apiFetch(`${import.meta.env.VITE_API_BASE_URL}/auth/verify`);
+        if (!verifyRes.ok) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             return thunkAPI.rejectWithValue('Invalid session');
         }
 
-        // Session is valid - rehydrate user from localStorage
-        const user = JSON.parse(localStorage.getItem('user'));
-        if (user) {
-            thunkAPI.dispatch(setBooklist(user.wishList || []));
-            thunkAPI.dispatch(setAllReadingStatuses(user.readingStatus || []));
-            thunkAPI.dispatch(setCustomLists(user.customLists || []));
+        // Fetch live user data so reading statuses / custom lists are always fresh
+        const storedUser = JSON.parse(localStorage.getItem('user'));
+        if (!storedUser?._id) return thunkAPI.rejectWithValue('No user in storage');
+
+        const profileRes = await apiFetch(`${import.meta.env.VITE_API_BASE_URL}/users/${storedUser._id}`);
+        if (!profileRes.ok) {
+            // Fall back to stale data rather than breaking the session
+            thunkAPI.dispatch(setBooklist(storedUser.wishList || []));
+            thunkAPI.dispatch(setAllReadingStatuses(storedUser.readingStatus || []));
+            thunkAPI.dispatch(setCustomLists(storedUser.customLists || []));
+            return storedUser;
         }
+
+        const user = await profileRes.json();
+        localStorage.setItem('user', JSON.stringify(user));
+        thunkAPI.dispatch(setBooklist(user.wishList || []));
+        thunkAPI.dispatch(setAllReadingStatuses(user.readingStatus || []));
+        thunkAPI.dispatch(setCustomLists(user.customLists || []));
         return user;
     }
 );
