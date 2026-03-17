@@ -88,9 +88,12 @@ app.use('/books', bookRoutes);
 app.use('/nlp', nlpRoutes);
 app.use('/recommendations', recommendationsRoutes);
 
-// The "catchall" handler: for any request that doesn't match one above, throw a 404 error.
+// SPA fallback: serve index.html for all non-API GET requests so client-side routing works.
 app.get('*', (req, res) => {
-  res.status(404).json({ error: 'Not Found' });
+  const indexPath = path.join(__dirname, '../frontend/dist', 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) res.status(404).json({ error: 'Not Found' });
+  });
 });
 
 if (process.env.NODE_ENV !== 'test') {
@@ -106,13 +109,5 @@ if (process.env.NODE_ENV !== 'test') {
     }
   })();
 }
-
-// only connect to prod database when NOT running tests
-// if (process.env.NODE_ENV !== 'test') {
-//   await connectDB();
-//   app.listen(PORT, () =>
-//     console.log(`Server running at http://localhost:${PORT}`)
-//   );
-// }
 
 export default app;  

@@ -1,4 +1,5 @@
 import Redis from 'ioredis';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -66,9 +67,10 @@ async function storeInRedis(key, data, expirationSeconds = 3600) {
 
 // for authentication: store blacklisted tokens and fingerprint keys
 const getFingerprintKey = (req) => {
-  // Check production name first, then dev name
   const fingerprint = req.cookies['__Secure-Fp'] || req.cookies['fp'];
-  return fingerprint ? `blacklist:fp:${fingerprint}` : null;
+  if (!fingerprint) return null;
+  const fpHash = crypto.createHash('sha256').update(decodeURIComponent(String(fingerprint))).digest('hex');
+  return `blacklist:fp:${fpHash}`;
 };
 
 async function deleteFromRedis(key) {
