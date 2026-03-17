@@ -2,19 +2,18 @@ import React, {useEffect, useState, useRef} from 'react';
 import './BookPage.css';
 import {BookPreview} from './BookPreview';
 import { useParams } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { addToBookListThunk, removeFromBookListThunk } from '../../redux/BooklistThunks.js';
-import { useSelector } from 'react-redux';
-import { Container, Grid, Box, Typography, Button, CircularProgress } from '@mui/material';
+import { useDispatch, useSelector } from 'react-redux';
+import { addToBookListThunk, removeFromBookListThunk, setReadingStatusThunk, createListThunk, updateListBooksThunk } from '../../redux/BooklistThunks.js';
+import { Container, Box, Typography, Button, CircularProgress, ToggleButton, ToggleButtonGroup, Menu, MenuItem, ListItemText, Divider, TextField } from '@mui/material';
 import { NovellaNavy } from '../../styles/colors';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import StarRating from '../ratings/starRating';
 import BookReview from './bookReview.jsx';
 import { GenreTags } from "./BookUtils.jsx";
 import BookUtils from "../../utils/BookUtils.js";
 import { sanitizeContent, sanitizeObject } from '../../utils/sanitize';
-import './BookPage.css';
 
 const sectionTitleStyle = {
     fontFamily: 'Source Serif Pro, serif',
@@ -62,6 +61,8 @@ export default function BookDetailsPage() {
     const dispatch = useDispatch();
     const userId = useSelector((state) => state.user?.user?._id);
     const booklist = useSelector((state) => state.booklist.items);
+    const readingStatuses = useSelector((state) => state.booklist.readingStatuses);
+    const customLists = useSelector((state) => state.booklist.customLists);
 
     const [book, setBook] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
@@ -72,6 +73,9 @@ export default function BookDetailsPage() {
     const [isInWishlist, setIsInWishlist] = useState(false);
     const [wishlistLoading, setWishlistLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
+    // List menu state
+    const [listMenuAnchor, setListMenuAnchor] = useState(null);
+    const [newListName, setNewListName] = useState('');
 
     const handleScrollToReview = () => {
         reviewRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -79,7 +83,6 @@ export default function BookDetailsPage() {
 
     const deleteReview = async () => {
         try {
-            console.log("clicked delete review");
             const review = await BookUtils.getUserReview(bookId, username);
             if (review) {
                 await BookUtils.deleteReview(review._id);
@@ -107,12 +110,7 @@ export default function BookDetailsPage() {
                 review = sanitizeObject(review);
                 allReviews = sanitizeObject(allReviews);
               
-                // Ore was here
-                console.log("review", review);
-                console.log("all reviews", allReviews);
                 const otherReviews = allReviews.filter(r => r.userId?.username !== username);
-                console.log("other reviews", otherReviews); 
-                // Non-ore touched
                 setBook(bookData);
                 setUserReview(review);
                 setBookReviews(otherReviews);
@@ -154,7 +152,6 @@ export default function BookDetailsPage() {
         setWishlistLoading(true);
         try {
             const thunk = isInWishlist ? removeFromBookListThunk : addToBookListThunk;
-            console.log("userId : ", userId);
             await dispatch(thunk({ userId, bookId })).unwrap();
             setIsInWishlist(!isInWishlist); // Optimistic update
         } catch (error) {
@@ -184,23 +181,107 @@ export default function BookDetailsPage() {
                     <StarRating rating={Math.round(book.averageRating)} />
                     <div className="load-more">
                         <button className="btn" onClick={handleScrollToReview}>Make Review</button>
-                        <Button
-                            variant="contained"
-                            startIcon={isInWishlist ? <FavoriteIcon sx={{ color: 'red' }} /> : <FavoriteBorderIcon />}
-                            onClick={handleWishlistToggle}
-                            disabled={wishlistLoading}
-                            sx={{
-                                backgroundColor: '#151B54', // NovellaNavy
-                                borderRadius: '10px', // Match 'Make Review' button
-                                textTransform: 'none', // Prevent all-caps
-                                fontWeight: 'bold',
-                                '&:hover': {
-                                    backgroundColor: '#1E213D', // NoirNavy
-                                },
-                            }}
-                        >
-                            {wishlistLoading ? 'Updating...' : (isInWishlist ? 'In Wishlist' : 'Add to Wishlist')}
-                        </Button>
+
+                        {isGuest ? (
+                            // Guest: simple wishlist heart
+                            <Button
+                                variant="contained"
+                                startIcon={isInWishlist ? <FavoriteIcon sx={{ color: 'red' }} /> : <FavoriteBorderIcon />}
+                                onClick={handleWishlistToggle}
+                                disabled={wishlistLoading}
+                                sx={{
+                                    backgroundColor: '#151B54',
+                                    borderRadius: '10px',
+                                    textTransform: 'none',
+                                    fontWeight: 'bold',
+                                    '&:hover': { backgroundColor: '#1E213D' },
+                                }}
+                            >
+                                {wishlistLoading ? 'Updating...' : (isInWishlist ? 'In Wishlist' : 'Add to Wishlist')}
+                            </Button>
+                        ) : (
+                            // Auth user: reading status selector + custom lists
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+                                <ToggleButtonGroup
+                                    exclusive
+                                    value={readingStatuses[bookId] || null}
+                                    onChange={async (_, newStatus) => {
+                                        // Clicking the active status deselects it (remove)
+                                        await dispatch(setReadingStatusThunk({
+                                            userId,
+                                            bookId,
+                                            status: newStatus === readingStatuses[bookId] ? null : newStatus,
+                                        }));
+                                    }}
+                                    size="small"
+                                    sx={{ flexWrap: 'wrap', gap: 0.5 }}
+                                >
+                                    <ToggleButton value="want_to_read" sx={{ textTransform: 'none', fontSize: '0.75rem' }}>
+                                        Want to Read
+                                    </ToggleButton>
+                                    <ToggleButton value="reading" sx={{ textTransform: 'none', fontSize: '0.75rem' }}>
+                                        Reading
+                                    </ToggleButton>
+                                    <ToggleButton value="have_read" sx={{ textTransform: 'none', fontSize: '0.75rem' }}>
+                                        Have Read
+                                    </ToggleButton>
+                                </ToggleButtonGroup>
+
+                                <Button
+                                    size="small"
+                                    startIcon={<PlaylistAddIcon />}
+                                    onClick={(e) => setListMenuAnchor(e.currentTarget)}
+                                    sx={{ textTransform: 'none', color: NovellaNavy, border: `1px solid ${NovellaNavy}`, borderRadius: '8px' }}
+                                >
+                                    Add to List
+                                </Button>
+                                <Menu
+                                    anchorEl={listMenuAnchor}
+                                    open={Boolean(listMenuAnchor)}
+                                    onClose={() => { setListMenuAnchor(null); setNewListName(''); }}
+                                >
+                                    {customLists.length === 0 && (
+                                        <MenuItem disabled><ListItemText primary="No lists yet" /></MenuItem>
+                                    )}
+                                    {customLists.map((list) => {
+                                        const inList = list.books.some(id => id === bookId || id?.toString() === bookId);
+                                        return (
+                                            <MenuItem
+                                                key={list._id}
+                                                onClick={async () => {
+                                                    await dispatch(updateListBooksThunk({
+                                                        userId, listId: list._id, bookId,
+                                                        operation: inList ? 'remove' : 'add',
+                                                    }));
+                                                    setListMenuAnchor(null);
+                                                }}
+                                            >
+                                                <ListItemText
+                                                    primary={list.name}
+                                                    secondary={inList ? '✓ Added' : null}
+                                                />
+                                            </MenuItem>
+                                        );
+                                    })}
+                                    <Divider />
+                                    <MenuItem disableRipple>
+                                        <TextField
+                                            size="small"
+                                            placeholder="New list name"
+                                            value={newListName}
+                                            onChange={(e) => setNewListName(e.target.value)}
+                                            onKeyDown={async (e) => {
+                                                if (e.key === 'Enter' && newListName.trim()) {
+                                                    await dispatch(createListThunk({ userId, name: newListName.trim() }));
+                                                    setNewListName('');
+                                                }
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    </MenuItem>
+                                </Menu>
+                            </Box>
+                        )}
                     </div>
                 </div>
                 <div className="book-info-column">

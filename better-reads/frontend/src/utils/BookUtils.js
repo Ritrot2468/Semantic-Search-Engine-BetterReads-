@@ -167,7 +167,56 @@ const BookUtils = {
             body: JSON.stringify({ reviewId }),
         });
         if (!res.ok) throw new Error('Failed to delete review');
-    }
+    },
+
+    // ─── Reading Status ────────────────────────────────────────────────────────
+
+    async getReadingStatuses(userId) {
+        const res = await apiFetch(`${BASE_URL}/users/${userId}/reading-status`);
+        if (!res.ok) throw new Error('Failed to fetch reading statuses');
+        return res.json(); // array of { bookId, status, addedAt }
+    },
+
+    // Pass status=null to remove the book's status
+    async setReadingStatus(userId, bookId, status) {
+        const res = await apiFetch(`${BASE_URL}/users/${userId}/reading-status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookId, status }),
+        });
+        if (!res.ok) throw new Error('Failed to set reading status');
+        return res.json();
+    },
+
+    // ─── Custom Lists ──────────────────────────────────────────────────────────
+
+    async createList(userId, name) {
+        const res = await apiFetch(`${BASE_URL}/users/${userId}/lists`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name }),
+        });
+        if (!res.ok) throw new Error('Failed to create list');
+        return res.json(); // returns updated customLists array
+    },
+
+    async deleteList(userId, listId) {
+        const res = await apiFetch(`${BASE_URL}/users/${userId}/lists/${listId}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) throw new Error('Failed to delete list');
+        return res.json();
+    },
+
+    async updateListBooks(userId, listId, bookId, operation) {
+        const res = await apiFetch(`${BASE_URL}/users/${userId}/lists/${listId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookId, operation }),
+        });
+        if (!res.ok) throw new Error(`Failed to ${operation} book in list`);
+        return res.json();
+    },
 };
 
 export default BookUtils;

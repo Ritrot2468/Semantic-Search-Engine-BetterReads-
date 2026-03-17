@@ -26,6 +26,24 @@ import '../components/Book/BookPage.css';
 import BookUtils from "../utils/BookUtils.js";
 import { sanitizeContent, sanitizeObject } from '../utils/sanitize';
 
+// ── AI Search history helpers (localStorage) ──────────────────────────────────
+const HISTORY_KEY = 'betterreads:ai-search-history';
+const HISTORY_MAX = 10;
+
+function loadSearchHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+  catch { return []; }
+}
+function saveSearchHistory(query) {
+  const q = query.trim();
+  if (!q) return;
+  const prev = loadSearchHistory().filter(h => h !== q);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify([q, ...prev].slice(0, HISTORY_MAX)));
+}
+function clearSearchHistory() {
+  localStorage.removeItem(HISTORY_KEY);
+}
+
 const GenreSelect = ({ genres, selectedGenres, onChange }) => (
   <FormControl sx={{ width: { xs: '100%', md: 280 } }}>
     <Select
@@ -214,8 +232,9 @@ const AISearch = ({ genres }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [history, setHistory] = useState(() => loadSearchHistory());
 
-  const handleSearch = async () => {
+  const runSearch = async (searchQuery) => {
     if (loading) return;
     setLoading(true);
     setError(null);
@@ -223,7 +242,7 @@ const AISearch = ({ genres }) => {
     setResults([]);
     try {
       const params = new URLSearchParams();
-      const sanitizedQuery = sanitizeContent(query.trim());
+      const sanitizedQuery = sanitizeContent(searchQuery.trim());
       if (sanitizedQuery) params.append('q', sanitizedQuery);
       selectedGenres.forEach(g => params.append('genre', sanitizeContent(g)));
       if (startYear) params.append('min_year', sanitizeContent(String(startYear)));
@@ -232,6 +251,8 @@ const AISearch = ({ genres }) => {
       const data = await BookUtils.fetchFromGateway(params);
       const raw = data.results || data;
       setResults(Array.isArray(raw) ? sanitizeObject(raw) : []);
+      saveSearchHistory(searchQuery);
+      setHistory(loadSearchHistory());
     } catch (err) {
       setError('Search failed. Please try again.');
       console.error(err);
@@ -239,6 +260,8 @@ const AISearch = ({ genres }) => {
       setLoading(false);
     }
   };
+
+  const handleSearch = () => runSearch(query);
 
   const handleGenreChange = (e) => {
     const { value } = e.target;
@@ -302,6 +325,28 @@ const AISearch = ({ genres }) => {
             Find AI Matches
           </Button>
         </Box>
+
+        {history.length > 0 && (
+          <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+            <Typography variant="caption" sx={{ color: '#666', mr: 0.5 }}>Recent:</Typography>
+            {history.map((h) => (
+              <Chip
+                key={h}
+                label={h}
+                size="small"
+                onClick={() => { setQuery(h); runSearch(h); }}
+                sx={{ cursor: 'pointer', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}
+              />
+            ))}
+            <Typography
+              variant="caption"
+              sx={{ color: '#999', cursor: 'pointer', ml: 'auto', '&:hover': { color: '#333' } }}
+              onClick={() => { clearSearchHistory(); setHistory([]); }}
+            >
+              Clear
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       {error && <Typography color="error" sx={{ textAlign: 'center', mb: 2 }}>{error}</Typography>}

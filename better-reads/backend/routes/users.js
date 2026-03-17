@@ -390,6 +390,134 @@ router.patch('/update-wishlist/:userId', [paramValidation.userId, ...userValidat
 });
 
 
+// ─── Reading Status ──────────────────────────────────────────────────────────
+
+// GET /users/:userId/reading-status — return all book statuses for this user
+router.get('/:userId/reading-status', paramValidation.userId, validateRequest, protect, async (req, res) => {
+    try {
+        if (req.user.id !== req.params.userId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        const user = await Users.findById(req.params.userId).select('readingStatus');
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.json(user.readingStatus);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to get reading status', details: err.message });
+    }
+});
+
+// PUT /users/:userId/reading-status — set or remove a book's reading status
+// body: { bookId, status } — omit or null status to remove the entry
+router.put('/:userId/reading-status', paramValidation.userId, validateRequest, protect, async (req, res) => {
+    try {
+        if (req.user.id !== req.params.userId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        const { bookId, status } = req.body;
+        if (!bookId) return res.status(400).json({ error: 'bookId is required' });
+
+        const validStatuses = ['want_to_read', 'reading', 'have_read'];
+        if (status && !validStatuses.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status', valid: validStatuses });
+        }
+
+        const user = await Users.findById(req.params.userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        // Remove existing entry for this book (if any)
+        user.readingStatus = user.readingStatus.filter(
+            entry => entry.bookId.toString() !== bookId.toString()
+        );
+
+        // Add new entry only if a status was provided
+        if (status) {
+            user.readingStatus.push({ bookId, status });
+        }
+
+        await user.save();
+        res.json(user.readingStatus);
+    } catch (err) {
+        res.status(400).json({ error: 'Failed to update reading status', details: err.message });
+    }
+});
+
+// ─── Custom Lists ─────────────────────────────────────────────────────────────
+
+// POST /users/:userId/lists — create a new custom list
+// body: { name }
+router.post('/:userId/lists', paramValidation.userId, validateRequest, protect, async (req, res) => {
+    try {
+        if (req.user.id !== req.params.userId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        const { name } = req.body;
+        if (!name?.trim()) return res.status(400).json({ error: 'List name is required' });
+
+        const user = await Users.findById(req.params.userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        user.customLists.push({ name: name.trim(), books: [] });
+        await user.save();
+
+        res.status(201).json(user.customLists);
+    } catch (err) {
+        res.status(400).json({ error: 'Failed to create list', details: err.message });
+    }
+});
+
+// PATCH /users/:userId/lists/:listId — add or remove a book from a custom list
+// body: { bookId, operation: "add" | "remove" }
+router.patch('/:userId/lists/:listId', paramValidation.userId, validateRequest, protect, async (req, res) => {
+    try {
+        if (req.user.id !== req.params.userId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        const { bookId, operation } = req.body;
+        if (!bookId) return res.status(400).json({ error: 'bookId is required' });
+        if (!['add', 'remove'].includes(operation)) {
+            return res.status(400).json({ error: 'operation must be "add" or "remove"' });
+        }
+
+        const user = await Users.findById(req.params.userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const list = user.customLists.id(req.params.listId);
+        if (!list) return res.status(404).json({ error: 'List not found' });
+
+        const alreadyIn = list.books.some(id => id.toString() === bookId.toString());
+        if (operation === 'add' && !alreadyIn) {
+            list.books.push(bookId);
+        } else if (operation === 'remove') {
+            list.books = list.books.filter(id => id.toString() !== bookId.toString());
+        }
+
+        await user.save();
+        res.json(list);
+    } catch (err) {
+        res.status(400).json({ error: 'Failed to update list', details: err.message });
+    }
+});
+
+// DELETE /users/:userId/lists/:listId — delete a custom list
+router.delete('/:userId/lists/:listId', paramValidation.userId, validateRequest, protect, async (req, res) => {
+    try {
+        if (req.user.id !== req.params.userId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        const user = await Users.findById(req.params.userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const list = user.customLists.id(req.params.listId);
+        if (!list) return res.status(404).json({ error: 'List not found' });
+
+        list.deleteOne();
+        await user.save();
+        res.json(user.customLists);
+    } catch (err) {
+        res.status(400).json({ error: 'Failed to delete list', details: err.message });
+    }
+});
+
 // DELETE /users/:id - delete user (optional/admin)
 router.delete('/:userId', paramValidation.userId, validateRequest, protect, async (req, res) => {
     try {
