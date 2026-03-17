@@ -3,9 +3,8 @@ import UserCard from '../components/UserProfile/UserCard';
 import { Typography, Container, Box, Divider } from '@mui/material';
 import BookGalleryManager from '../components/Book/BookGalleryManager';
 import { useSelector, useDispatch } from 'react-redux';
-import { clearUser } from '../redux/UserSlice';
-import { clearBooklist } from '../redux/Booklist.js';
 import { useNavigate } from 'react-router-dom';
+import { logoutUser } from '../redux/UserThunks.js';
 
 const sectionHeadingStyle = {
   fontFamily: 'Georgia, serif',
@@ -36,14 +35,8 @@ const UserProfile = () => {
   };
 
   const handleSignOut = async () => {
-    try {
-      dispatch(clearUser());
-      dispatch(clearBooklist());
-      navigate('/');
-      localStorage.removeItem('appState');
-    } catch (err) {
-      console.error('Sign out failed:', err);
-    }
+    await dispatch(logoutUser());
+    navigate('/');
   };
 
   // Group book IDs by reading status

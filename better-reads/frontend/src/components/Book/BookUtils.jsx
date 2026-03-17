@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import './BookPage.css';
+import FavoriteFilledIcon from '@mui/icons-material/Favorite';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 
 export const GenreTags = ({ genres }) => {
     const [showAll, setShowAll] = useState(false);
@@ -35,22 +37,24 @@ export const GenreTags = ({ genres }) => {
     );
 };
 
-export const FavoriteIcon = ({ isFavorite, onClick }) => {
-    const iconSrc = isFavorite
-        ? '/src/assets/icons/favorite-filled.svg'
-        : '/src/assets/icons/favorite-outline.svg';
-
+export const FavoriteIcon = ({ isFavorite, onClick, disabled }) => {
+    const Icon = isFavorite ? FavoriteFilledIcon : FavoriteBorderIcon;
     return (
-
-            <img
-                src={iconSrc}
-                alt="Favorite Icon"
-                className="favorite-icon"
-                onClick={onClick}
-                role="button"
-            />
-
-
+        <Icon
+            className="favorite-icon"
+            onClick={disabled ? undefined : onClick}
+            role="button"
+            sx={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                color: isFavorite ? 'red' : 'rgba(0,0,0,0.4)',
+                cursor: disabled ? 'default' : 'pointer',
+                fontSize: '1.6rem',
+                filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
+                '&:hover': { color: isFavorite ? '#c62828' : 'rgba(0,0,0,0.65)' },
+            }}
+        />
     );
 };
 
