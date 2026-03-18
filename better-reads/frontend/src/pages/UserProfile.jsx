@@ -23,8 +23,8 @@ const STATUS_LABELS = {
 const UserProfile = () => {
   const user = useSelector((state) => state.user?.user);
   const booklist = useSelector((state) => state.booklist.items);
-  const readingStatuses = useSelector((state) => state.booklist.readingStatuses);
-  const customLists = useSelector((state) => state.booklist.customLists);
+  const readingStatuses = useSelector((state) => state.booklist.readingStatuses ?? {});
+  const customLists = useSelector((state) => state.booklist.customLists ?? []);
   const isGuest = user?.isGuest;
 
   const dispatch = useDispatch();
