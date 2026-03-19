@@ -11,6 +11,7 @@ import { userValidationRules, validateRequest, sanitizeInput, paramValidation } 
 import { param } from 'express-validator';
 import crypto from 'crypto';
 import { protect } from '../middleware/authentification.js';
+import { passwordChangeLimiter } from '../middleware/rateLimiter.js';
 import { storeInRedis, getFromRedis, deleteFromRedis } from '../services/redisClient.js';
 import { getRecommendations } from '../services/recommendations.js';
 
@@ -253,7 +254,7 @@ router.get('/:userId', paramValidation.userId, validateRequest, protect, async (
 });
 
 
-router.post('/change-password', protect, async (req, res) => {
+router.post('/change-password', protect, passwordChangeLimiter, async (req, res) => {
     try {
         const { username, currentPassword, newPassword } = req.body;
 
