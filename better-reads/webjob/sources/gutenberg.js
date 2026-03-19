@@ -54,7 +54,7 @@ export function transform(book) {
 
 async function fetchPage(page) {
     const res = await fetch(`${API_BASE}?languages=en&page=${page}`, {
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) { console.warn(`    [WARN] Gutendex ${res.status} page ${page}`); return null; }
     return res.json();
