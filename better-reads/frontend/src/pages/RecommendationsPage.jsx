@@ -56,7 +56,11 @@ const RecommendationsPage = () => {
         const url = `${backendUrl}/recommendations/${username}`;
         console.log('Fetching recommendations from:', url);
         
-        const res = await fetch(url);
+        const token = getSanitizedItem('token', null);
+        const res = await fetch(url, {
+          credentials: 'include', // send the fingerprint cookie
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
         if (!res.ok) throw new Error('Failed to fetch recommendations');
         const data = await res.json();
         
