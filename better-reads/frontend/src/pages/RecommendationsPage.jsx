@@ -10,6 +10,7 @@ import {
 import { HelpOutline } from '@mui/icons-material';
 import BookGalleryManager from '../components/Book/BookGalleryManager';
 import { getSanitizedItem } from '../utils/sanitize';
+import { apiFetch } from '../api/apiFetch.js';
 
 import HeroBanner from '../components/common/HeroBanner';
 import '../components/Book/BookPage.css';
@@ -56,7 +57,7 @@ const RecommendationsPage = () => {
         const url = `${backendUrl}/recommendations/${username}`;
         console.log('Fetching recommendations from:', url);
         
-        const res = await fetch(url);
+        const res = await apiFetch(url);
         if (!res.ok) throw new Error('Failed to fetch recommendations');
         const data = await res.json();
         
