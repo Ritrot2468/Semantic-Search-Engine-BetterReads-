@@ -53,12 +53,25 @@ async function getRecommendations(fn_username) {
       console.error("Error details:", error.response?.data || error.message);
     }
 
-    const interactedBookIds = await getInteractedBookIds(user._id);
+    const readingStatuses = user.readingStatus || [];
+    const interactedBookIds = await getInteractedBookIds(user._id, readingStatuses);
 
-    // Filter out books the user has already interacted with
+    // Filter out books the user has already interacted with or finished
     const filteredApiRecs = apiRecommendations.filter(
       bookId => !interactedBookIds.includes(bookId)
     );
+
+    // Boost genre pool with genres from "want to read" books —
+    // user has expressed interest in those books, so similar books rank higher
+    const wantToReadIds = readingStatuses
+      .filter(s => s.status === 'want_to_read')
+      .map(s => s.bookId);
+    let boostedGenres = [...(user.favoriteGenres || [])];
+    if (wantToReadIds.length > 0) {
+      const wantToReadBooks = await Book.find({ _id: { $in: wantToReadIds } }, 'genre').exec();
+      const extraGenres = wantToReadBooks.flatMap(b => b.genre);
+      boostedGenres = [...new Set([...boostedGenres, ...extraGenres])];
+    }
 
     // If we have enough API recommendations, use those
     if (filteredApiRecs.length >= 5) {
@@ -68,8 +81,8 @@ async function getRecommendations(fn_username) {
 
     // Otherwise, combine multiple recommendation strategies
     const combinedRecommendations = await getCombinedRecommendations(
-      user._id, 
-      user.favoriteGenres, 
+      user._id,
+      boostedGenres,
       interactedBookIds,
       filteredApiRecs
     );
@@ -85,14 +98,14 @@ async function getRecommendations(fn_username) {
   }
 }
 
-// async function getInteractedBookIds(userId) {
-//   const reviews = await Review.find({ userId }).exec();
-//   console.log(reviews);
-//   return reviews.map(review => review.bookId);
-// }
-async function getInteractedBookIds(userId) {
-  // Returns just an array of IDs directly from MongoDB indexes
-  return await Review.distinct('bookId', { userId });
+// Returns book IDs the user has already reviewed OR marked as "have_read" —
+// both should be excluded from recommendations.
+async function getInteractedBookIds(userId, readingStatuses = []) {
+  const reviewedIds = await Review.distinct('bookId', { userId });
+  const haveReadIds = readingStatuses
+    .filter(s => s.status === 'have_read')
+    .map(s => s.bookId.toString());
+  return [...new Set([...reviewedIds.map(id => id.toString()), ...haveReadIds])];
 }
 
 /**
