@@ -6,16 +6,20 @@ import userReducer, {guestUser} from '../redux/UserSlice.js';
 const loadAppStateFromLocalStorage = () => {
     try {
         const serialized = localStorage.getItem('appState');
-        if (serialized) return JSON.parse(serialized);
+        if (!serialized) return undefined; // let Redux use each slice's initialState
+        const saved = JSON.parse(serialized);
+        // Merge saved state with defaults so new fields added to slices are
+        // always present even when loading from stale localStorage data.
         return {
-            userInfo: { user: guestUser, status: 'idle', error: null, isGuest: true },
-            booklist: { items: [] }
+            user: saved.user,
+            booklist: {
+                items: saved.booklist?.items ?? [],
+                readingStatuses: saved.booklist?.readingStatuses ?? {},
+                customLists: saved.booklist?.customLists ?? [],
+            },
         };
     } catch (err) {
-        return {
-            userInfo: { user: guestUser, status: 'idle', error: null, isGuest: true },
-            booklist: { items: [] }
-        };
+        return undefined; // let Redux use each slice's initialState
     }
 };
 

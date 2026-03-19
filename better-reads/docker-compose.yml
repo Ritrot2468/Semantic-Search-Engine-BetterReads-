@@ -87,6 +87,26 @@ services:
     volumes:
       - ./recommender:/app
 
+  # Book Fetcher WebJob (mirrors Azure WebJob — runs once on container start)
+  # To trigger manually: docker compose run --rm book-fetcher
+  book-fetcher:
+    image: node:20-alpine
+    container_name: betterreads-book-fetcher
+    working_dir: /app
+    command: sh -c "npm install --omit=dev && node index.js"
+    depends_on:
+      - mongodb
+    env_file:
+      - ./webjob/.env
+    environment:
+      - MONGO_URI=${MONGO_URI}
+    networks:
+      - betterreads-network
+    volumes:
+      - ./webjob:/app
+    profiles:
+      - tools   # not started by default: docker compose --profile tools up book-fetcher
+
   # Frontend service
   frontend:
     build:
