@@ -63,6 +63,7 @@ const BookGalleryManager = ({ books, limit }) => {
                         title={book.title}
                         rating={Math.round(book.averageRating)}
                         genres={book.genre}
+                        source={book.source}
                     />
                 </Grid>
             ))}

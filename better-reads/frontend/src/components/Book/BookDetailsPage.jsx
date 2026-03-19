@@ -11,7 +11,7 @@ import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import StarRating from '../ratings/starRating';
 import BookReview from './bookReview.jsx';
-import { GenreTags } from "./BookUtils.jsx";
+import { GenreTags, SourceBadge } from "./BookUtils.jsx";
 import BookUtils from "../../utils/BookUtils.js";
 import { sanitizeContent, sanitizeObject } from '../../utils/sanitize';
 
@@ -288,6 +288,21 @@ export default function BookDetailsPage() {
                     <Typography variant="h3" component="h1" className="book-title" sx={{ fontWeight: 'bold', mb: 2, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
                         {sanitizeContent(book.title)}
                     </Typography>
+                    {book.source && book.source !== 'published' && (
+                        <Box sx={{ mb: 2 }}>
+                            <SourceBadge
+                                source={book.source}
+                                sx={{ fontSize: '0.7rem', px: 1.5, py: 0.5 }}
+                            />
+                            {book.sourceUrl && (
+                                <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+                                    <a href={book.sourceUrl} target="_blank" rel="noopener noreferrer">
+                                        Read on source site ↗
+                                    </a>
+                                </Typography>
+                            )}
+                        </Box>
+                    )}
                     <Typography sx={{ color: 'var(--color-text-light)', mb: 2 }}>
                         {sanitizeContent(book.description)}
                     </Typography>
