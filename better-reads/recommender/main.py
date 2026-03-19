@@ -11,6 +11,7 @@ import asyncio
 import pymongo
 import scipy.sparse as sp
 from pymongo import MongoClient
+from bson import ObjectId
 from dotenv import load_dotenv
 from datetime import datetime
 from lightfm import LightFM
@@ -35,6 +36,7 @@ mongo_client = MongoClient(mongo_uri)
 db = mongo_client['bookdb']
 reviews_collection = db['reviews']
 users_collection = db['users']
+books_collection = db['books']
 
 # Redis key for user-item matrix
 USER_ITEM_MATRIX_KEY = 'user_item_matrix'
@@ -239,8 +241,10 @@ def recommend_books(data: RecommendRequest):
         matrix_dict = json.loads(cached_data)
         
         # Check if user exists in the matrix directly from the dictionary
+        # New users who signed up after startup won't be in the matrix yet — fall back to popularity
         if username not in matrix_dict:
-            raise HTTPException(status_code=404, detail=f"User {username} not found in recommendation matrix")
+            print(f"User {username} not in matrix yet — using popularity fallback")
+            use_popularity_fallback = True
             
         print(f"User {username} found in matrix_dict. Matrix has {len(matrix_dict)} users.")
         print(f"User's data in matrix_dict: {matrix_dict.get(username, 'NOT_FOUND')}")
@@ -281,10 +285,10 @@ def recommend_books(data: RecommendRequest):
         user_mapping = {uid: i for i, uid in enumerate(user_ids)}
         item_mapping = {iid: i for i, iid in enumerate(item_ids)}
         
-        # Check if user exists in mapping
+        # Check if user exists in mapping (can happen if user has no ratings yet)
         if username not in user_mapping:
-            print(f"User {username} not found in user mapping.")
-            raise HTTPException(status_code=404, detail=f"User {username} not found in recommendation matrix")
+            print(f"User {username} not in user mapping — using popularity fallback")
+            use_popularity_fallback = True
         
         # Convert to sparse matrix format for LightFM
         interactions = []
@@ -309,19 +313,66 @@ def recommend_books(data: RecommendRequest):
         
         print(f"Created sparse interaction matrix with shape {interaction_matrix.shape}")
         
+        # Build item genre feature matrix for LightFM
+        # Shape: (n_items, n_items + n_genres) — identity columns give each item its own embedding
+        item_features = None
+        try:
+            valid_object_ids = []
+            item_id_to_idx = {}
+            for iid, idx in item_mapping.items():
+                try:
+                    valid_object_ids.append(ObjectId(iid))
+                    item_id_to_idx[iid] = idx
+                except Exception:
+                    pass  # skip non-ObjectId strings (e.g. from initial matrix)
+
+            book_docs = list(books_collection.find(
+                {'_id': {'$in': valid_object_ids}},
+                {'_id': 1, 'genre': 1}
+            ))
+            book_genre_map = {str(doc['_id']): doc.get('genre', []) for doc in book_docs}
+
+            all_genres = sorted({g for genres in book_genre_map.values() for g in genres})
+            genre_mapping = {g: i for i, g in enumerate(all_genres)}
+            n_genres = len(all_genres)
+
+            if n_genres > 0:
+                feat_rows, feat_cols = [], []
+                for iid, idx in item_id_to_idx.items():
+                    for genre in book_genre_map.get(iid, []):
+                        if genre in genre_mapping:
+                            feat_rows.append(idx)
+                            feat_cols.append(genre_mapping[genre])
+
+                genre_matrix = sp.csr_matrix(
+                    (np.ones(len(feat_rows)), (feat_rows, feat_cols)),
+                    shape=(n_items, n_genres)
+                )
+                # Concatenate identity (item-specific embeddings) + genre features
+                item_features = sp.hstack([sp.eye(n_items, format='csr'), genre_matrix])
+                print(f"Built item feature matrix: {n_items} items × {n_items + n_genres} features ({n_genres} genres)")
+        except Exception as feat_err:
+            print(f"Could not build item features, falling back to pure CF: {feat_err}")
+            item_features = None
+
         # Train LightFM model
         model = LightFM(loss='warp')
-        
+
         try:
-            # Train for a few epochs - adjust as needed for performance vs. accuracy
-            model.fit(interaction_matrix, epochs=5, verbose=True)
+            if item_features is not None:
+                model.fit(interaction_matrix, item_features=item_features, epochs=5, verbose=True)
+            else:
+                model.fit(interaction_matrix, epochs=5, verbose=True)
             print("LightFM model trained successfully")
-            
+
             # Get user index
             user_idx = user_mapping[username]
-            
+
             # Predict scores for all items
-            scores = model.predict(user_idx, np.arange(n_items))
+            if item_features is not None:
+                scores = model.predict(user_idx, np.arange(n_items), item_features=item_features)
+            else:
+                scores = model.predict(user_idx, np.arange(n_items))
             
             # Get items the user has already interacted with
             user_items = set()
