@@ -48,9 +48,19 @@ const BookSchema = new mongoose.Schema({
   title: {
     type: String,
     required: true,
-  }
+  },
+  source: {
+    type: String,
+    enum: ['published', 'royal_road', 'scribble_hub', 'gutenberg'],
+    default: 'published',
+  },
+  sourceUrl: {
+    type: String,
+    default: null,
+  },
 }, { timestamps: true });
 BookSchema.index({ ISBN: 1 });
-BookSchema.index({ title: 'text', author: 'text' }); 
+BookSchema.index({ title: 'text', author: 'text' });
+BookSchema.index({ source: 1 });
 
 export default mongoose.model('Books', BookSchema, 'books');

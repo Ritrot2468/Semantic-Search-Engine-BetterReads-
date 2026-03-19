@@ -12,6 +12,9 @@
 
 import 'dotenv/config';
 import mongoose from 'mongoose';
+import { fetchAll as fetchRoyalRoad }  from './sources/royalroad.js';
+import { fetchAll as fetchScribbleHub } from './sources/scribblehub.js';
+import { fetchAll as fetchGutenberg }  from './sources/gutenberg.js';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -62,6 +65,8 @@ const BookSchema = new mongoose.Schema({
     ratingsCount:     { type: Number, required: true, default: 0 },
     reviewCount:      { type: Number, required: true, default: 0 },
     title:            { type: String, required: true },
+    source:           { type: String, default: 'published' },
+    sourceUrl:        { type: String, default: null },
 }, { timestamps: true });
 
 BookSchema.index({ ISBN: 1 });
@@ -164,6 +169,8 @@ function transform(item) {
         ratingsCount:     typeof info.ratingsCount  === 'number' ? info.ratingsCount  : 0,
         numberOfEditions: 1,
         reviewCount:      0,
+        source:           'published',
+        sourceUrl:        null,
     };
 }
 
@@ -197,6 +204,8 @@ async function upsertBooks(books) {
                     // (handled via $setOnInsert + conditional in application logic,
                     //  here we always update external rating metadata)
                     ratingsCount:     book.ratingsCount,
+                    source:           book.source ?? 'published',
+                    sourceUrl:        book.sourceUrl ?? null,
                 },
                 // Only set averageRating on insert (don't overwrite user reviews)
                 $setOnInsert: {
@@ -266,6 +275,30 @@ async function run() {
 
         // Pause between genres to stay well within rate limits
         await sleep(500);
+    }
+
+    // ── Web novel & public domain sources ──────────────────────────────────────
+    const webSources = [
+        { name: 'Royal Road',     fn: () => fetchRoyalRoad(3) },
+        { name: 'Scribble Hub',   fn: () => fetchScribbleHub() },
+        { name: 'Project Gutenberg', fn: () => fetchGutenberg(5) },
+    ];
+
+    for (const src of webSources) {
+        console.log(`\n  Source: "${src.name}"`);
+        try {
+            const books = await src.fn();
+            if (books.length > 0) {
+                const { upserted, modified } = await upsertBooks(books);
+                totalUpserted += upserted;
+                totalModified += modified;
+                console.log(`    → ${books.length} fetched | ${upserted} inserted | ${modified} updated`);
+            } else {
+                console.log(`    → no books fetched`);
+            }
+        } catch (err) {
+            console.error(`  [ERROR] ${src.name} ingestion failed:`, err.message);
+        }
     }
 
     // Summary

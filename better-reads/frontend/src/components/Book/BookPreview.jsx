@@ -9,11 +9,11 @@ import {
   Typography,
   Box,
 } from '@mui/material';
-import { FavoriteIcon, GenreTags } from './BookUtils.jsx';
+import { FavoriteIcon, GenreTags, SourceBadge } from './BookUtils.jsx';
 import StarRating from '../ratings/starRating';
 import { addToBookListThunk, removeFromBookListThunk } from '../../redux/BooklistThunks.js';
 
-export function BookPreview({ bookId, coverUrl, title, rating, genres }) {
+export function BookPreview({ bookId, coverUrl, title, rating, genres, source }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const userId = useSelector((state) => state.user.user._id);
@@ -71,6 +71,11 @@ export function BookPreview({ bookId, coverUrl, title, rating, genres }) {
             onClick={handleFavoriteClick}
             disabled={loading}
           />
+          {source && source !== 'published' && (
+            <Box sx={{ position: 'absolute', bottom: 8, left: 8 }}>
+              <SourceBadge source={source} />
+            </Box>
+          )}
         </Box>
         <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <Typography gutterBottom variant="h6" component="div">
