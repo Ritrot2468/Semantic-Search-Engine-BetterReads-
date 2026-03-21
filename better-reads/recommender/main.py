@@ -278,10 +278,21 @@ def recommend_books(data: RecommendRequest):
         # Fill NaN values with 0 to ensure matrix operations work correctly
         user_item_matrix = user_item_matrix.fillna(0)
         
-        # Create mappings between user/item IDs and matrix indices
+        # Create mappings between user/item IDs and matrix indices.
+        # Expand item_ids to include ALL books in MongoDB — not just reviewed ones.
+        # New books (from Royal Road, Gutenberg, etc.) have zero interactions but
+        # LightFM can still score them via genre item features (content-based cold start).
         user_ids = list(user_item_matrix.index)
-        item_ids = list(user_item_matrix.columns)
-        
+        reviewed_item_ids = set(user_item_matrix.columns)
+        try:
+            all_book_ids = [str(b['_id']) for b in books_collection.find({}, {'_id': 1})]
+            item_ids = list(reviewed_item_ids | set(all_book_ids))
+            print(f"Expanded item catalogue: {len(reviewed_item_ids)} reviewed + "
+                  f"{len(item_ids) - len(reviewed_item_ids)} new = {len(item_ids)} total books")
+        except Exception as e:
+            print(f"Could not fetch all book IDs, using reviewed books only: {e}")
+            item_ids = list(reviewed_item_ids)
+
         user_mapping = {uid: i for i, uid in enumerate(user_ids)}
         item_mapping = {iid: i for i, iid in enumerate(item_ids)}
         
