@@ -13,14 +13,12 @@ RUN npm install
 # Copy the rest of your application files
 COPY . .
 
-# Build the application (this injects environment variables)
-RUN npm run build
-
 # Expose the port your app runs on
 EXPOSE 5173
 
 # Force it to listen on all interfaces (not just localhost): used for docker trouble shooting
 # ENV HOST=0.0.0.0
 
-# Serve the built application
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173"]
+# Run the Vite dev server directly (not build+preview) since docker-compose bind-mounts
+# the source over /app at runtime, which would wipe out any pre-built dist folder anyway.
+CMD ["npm", "start"]
